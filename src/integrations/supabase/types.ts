@@ -35,9 +35,13 @@ export type Database = {
       orders: {
         Row: {
           admin_notes: string | null
+          balance_cents: number
           canceled_at: string | null
+          capi_purchase_sent_at: string | null
           cep: string | null
           city: string | null
+          client_ip: string | null
+          client_user_agent: string | null
           cod_method: string | null
           complement: string | null
           created_at: string
@@ -47,12 +51,17 @@ export type Database = {
           customer_phone: string
           delivered_at: string | null
           delivery_method: string
+          deposit_cents: number
+          deposit_paid_at: string | null
           discount_cents: number
           distance_km: number | null
           district: string | null
+          fbc: string | null
+          fbp: string | null
           freight_cents: number
           freight_mode: string | null
           id: string
+          meta_event_id: string | null
           number: string | null
           order_number: string
           paid_at: string | null
@@ -68,6 +77,7 @@ export type Database = {
           street: string | null
           subtotal_cents: number
           total_cents: number
+          tracking_consent: boolean
           uf: string | null
           unit_price_cents: number
           updated_at: string
@@ -81,9 +91,13 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          balance_cents?: number
           canceled_at?: string | null
+          capi_purchase_sent_at?: string | null
           cep?: string | null
           city?: string | null
+          client_ip?: string | null
+          client_user_agent?: string | null
           cod_method?: string | null
           complement?: string | null
           created_at?: string
@@ -93,12 +107,17 @@ export type Database = {
           customer_phone: string
           delivered_at?: string | null
           delivery_method: string
+          deposit_cents?: number
+          deposit_paid_at?: string | null
           discount_cents?: number
           distance_km?: number | null
           district?: string | null
+          fbc?: string | null
+          fbp?: string | null
           freight_cents?: number
           freight_mode?: string | null
           id?: string
+          meta_event_id?: string | null
           number?: string | null
           order_number: string
           paid_at?: string | null
@@ -114,6 +133,7 @@ export type Database = {
           street?: string | null
           subtotal_cents: number
           total_cents: number
+          tracking_consent?: boolean
           uf?: string | null
           unit_price_cents: number
           updated_at?: string
@@ -127,9 +147,13 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          balance_cents?: number
           canceled_at?: string | null
+          capi_purchase_sent_at?: string | null
           cep?: string | null
           city?: string | null
+          client_ip?: string | null
+          client_user_agent?: string | null
           cod_method?: string | null
           complement?: string | null
           created_at?: string
@@ -139,12 +163,17 @@ export type Database = {
           customer_phone?: string
           delivered_at?: string | null
           delivery_method?: string
+          deposit_cents?: number
+          deposit_paid_at?: string | null
           discount_cents?: number
           distance_km?: number | null
           district?: string | null
+          fbc?: string | null
+          fbp?: string | null
           freight_cents?: number
           freight_mode?: string | null
           id?: string
+          meta_event_id?: string | null
           number?: string | null
           order_number?: string
           paid_at?: string | null
@@ -160,6 +189,7 @@ export type Database = {
           street?: string | null
           subtotal_cents?: number
           total_cents?: number
+          tracking_consent?: boolean
           uf?: string | null
           unit_price_cents?: number
           updated_at?: string
@@ -233,9 +263,14 @@ export type Database = {
           cod_enabled: boolean
           cod_methods: string[]
           delivery_estimate_text: string
+          deposit_cents: number
           extra_km_price_cents: number | null
           free_shipping_radius_km: number
           id: number
+          installment_rates: Json
+          installments_max: number
+          meta_pixel_id: string
+          meta_test_event_code: string
           pay_on_delivery_max_km: number
           pix_enabled: boolean
           road_factor: number
@@ -250,9 +285,14 @@ export type Database = {
           cod_enabled?: boolean
           cod_methods?: string[]
           delivery_estimate_text?: string
+          deposit_cents?: number
           extra_km_price_cents?: number | null
           free_shipping_radius_km?: number
           id?: number
+          installment_rates?: Json
+          installments_max?: number
+          meta_pixel_id?: string
+          meta_test_event_code?: string
           pay_on_delivery_max_km?: number
           pix_enabled?: boolean
           road_factor?: number
@@ -267,9 +307,14 @@ export type Database = {
           cod_enabled?: boolean
           cod_methods?: string[]
           delivery_estimate_text?: string
+          deposit_cents?: number
           extra_km_price_cents?: number | null
           free_shipping_radius_km?: number
           id?: number
+          installment_rates?: Json
+          installments_max?: number
+          meta_pixel_id?: string
+          meta_test_event_code?: string
           pay_on_delivery_max_km?: number
           pix_enabled?: boolean
           road_factor?: number
