@@ -1,18 +1,21 @@
 import { useState } from "react";
 import { Truck } from "lucide-react";
-import { quoteShipping, type ShippingQuote } from "@/lib/shipping";
+import { quoteShipping, useSettings, waLink } from "@/lib/api";
+import type { ShippingQuote } from "@/lib/shipping";
 import { maskCep, money } from "@/lib/format";
-import { shippingConfig, whatsappLink } from "@/config/store";
 
 export function ShippingCalculator() {
+  const s = useSettings();
   const [cep, setCep] = useState("");
   const [state, setState] = useState<{ status: "idle" | "loading" | "ok" | "error"; quote?: ShippingQuote; error?: string }>({ status: "idle" });
-  const wa = whatsappLink("Olá! Quero saber o frete para o CEP " + cep);
+  const wa = waLink(s.whatsapp_number, "Olá! Quero saber o frete para o CEP " + cep);
   async function run(e: React.FormEvent) {
     e.preventDefault();
     setState({ status: "loading" });
-    try { setState({ status: "ok", quote: await quoteShipping(cep) }); }
-    catch (err) { setState({ status: "error", error: (err as Error).message }); }
+    try {
+      const r = await quoteShipping(cep);
+      setState(r.ok ? { status: "ok", quote: r.quote } : { status: "error", error: r.error });
+    } catch { setState({ status: "error", error: "Não conseguimos calcular o frete agora." }); }
   }
   const q = state.quote;
   return (
@@ -32,10 +35,11 @@ export function ShippingCalculator() {
         )}
         {state.status === "ok" && q && (
           <div className="space-y-1">
-            <p className="text-muted-foreground">{q.address.city}/{q.address.uf} — a ~{q.distanceKm} km da loja</p>
-            {q.free ? <p className="font-semibold text-success-strong">Frete grátis · chega {shippingConfig.deliveryEstimateText}</p>
-              : q.price != null ? <p className="font-semibold">Frete: {money(q.price)}</p>
-              : <p className="font-semibold">Frete a combinar com a loja</p>}
+            <p className="text-muted-foreground">{q.address.city}/{q.address.uf}{q.distanceKm != null && <> — a ~{q.distanceKm} km da loja</>}</p>
+            {q.mode === "free" ? <p className="font-semibold text-success-strong">Frete grátis · chega {s.delivery_estimate_text}</p>
+              : q.mode === "paid" && q.freightCents != null ? <p className="font-semibold">Frete: {money(q.freightCents)}</p>
+              : q.mode === "arrange" ? <p className="font-semibold">Frete a combinar com a loja</p>
+              : <p className="text-muted-foreground">Não conseguimos calcular a distância agora.</p>}
             <p className="text-muted-foreground">Retirar na loja: grátis</p>
           </div>
         )}

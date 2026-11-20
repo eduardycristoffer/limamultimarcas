@@ -9,22 +9,25 @@ import { ShippingCalculator } from "@/components/lima/ShippingCalculator";
 import { WhatsAppIcon } from "@/components/lima/WhatsAppIcon";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { getProduct, products, type Product } from "@/data/products";
-import { mapsUrl, paymentConfig, shippingConfig, store, whatsappLink } from "@/config/store";
+import { getProduct, type Product } from "@/data/products";
+import { mapsUrl, store } from "@/config/store";
+import { catalogQuery, mergeCatalog, settingsQuery, useProducts, useSettings, waLink } from "@/lib/api";
 import { money } from "@/lib/format";
 import { setBuyIntent } from "@/lib/checkout-store";
 
 export const Route = createFileRoute("/moto/$slug")({
-  loader: ({ params }) => {
-    const p = getProduct(params.slug);
+  loader: async ({ params, context }) => {
+    const [cat, s] = await Promise.all([context.queryClient.ensureQueryData(catalogQuery), context.queryClient.ensureQueryData(settingsQuery)]);
+    const p = mergeCatalog(cat).find((x) => x.slug === params.slug);
     if (!p) throw notFound();
-    return { slug: p.slug };
+    return { slug: p.slug, price: p.price, stock: p.stock, radius: s.free_shipping_radius_km };
   },
   head: ({ loaderData }) => {
-    const p = loaderData ? getProduct(loaderData.slug) : undefined;
-    if (!p) return { meta: [{ title: "Moto não encontrada — Lima Multimarcas" }, { name: "robots", content: "noindex" }] };
+    const base = loaderData ? getProduct(loaderData.slug) : undefined;
+    const p = base && loaderData ? { ...base, price: loaderData.price, stock: loaderData.stock } : undefined;
+    if (!p || !loaderData) return { meta: [{ title: "Moto não encontrada — Lima Multimarcas" }, { name: "robots", content: "noindex" }] };
     const title = `${p.name} por ${money(p.price)} — Lima Multimarcas`;
-    const desc = `${p.name}: ${p.highlights.join(", ")}. Frete grátis até ${shippingConfig.freeShippingRadiusKm} km de Montes Claros e pagamento na entrega.`;
+    const desc = `${p.name}: ${p.highlights.join(", ")}. Frete grátis até ${loaderData.radius} km de Montes Claros.`;
     return {
       meta: [
         { title }, { name: "description", content: desc },
@@ -58,13 +61,16 @@ export const Route = createFileRoute("/moto/$slug")({
 
 function ProductPage() {
   const { slug } = Route.useLoaderData();
-  const p = getProduct(slug)!;
+  const products = useProducts();
+  const s = useSettings();
+  const p = products.find((x) => x.slug === slug) ?? { ...getProduct(slug)!, cardAvailable: false };
   const [qty, setQty] = useState(1);
   const navigate = useNavigate();
-  const wa = whatsappLink(`Olá, Lima! Tenho interesse na ${p.name} (${money(p.price)}).`);
+  const wa = waLink(s.whatsapp_number, `Olá, Lima! Tenho interesse na ${p.name} (${money(p.price)}).`);
   const buy = () => { setBuyIntent({ slug: p.slug, quantity: qty }); navigate({ to: "/checkout" }); };
   const others = products.filter((o) => o.slug !== p.slug);
-  const pm = paymentConfig.payments;
+  const pm = { pix: s.pix_available, payOnDelivery: s.cod_enabled, card: s.card_enabled && p.cardAvailable };
+  const radius = s.free_shipping_radius_km;
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">
@@ -76,7 +82,7 @@ function ProductPage() {
           <div><OfferBadge>{p.badge}</OfferBadge></div>
           <h1 className="mt-3 text-4xl font-extrabold md:text-5xl">{p.name}</h1>
           <p className="mt-2 text-4xl font-extrabold">{money(p.price)}</p>
-          <p className="mt-2 font-semibold">Frete grátis até {shippingConfig.freeShippingRadiusKm} km · Pague na entrega</p>
+          <p className="mt-2 font-semibold">Frete grátis até {radius} km{s.cod_enabled && " · Pague na entrega"}</p>
         </div>
       </section>
 
@@ -92,8 +98,8 @@ function ProductPage() {
           <aside className="rounded-lg border border-border p-4" aria-label="Comprar">
             <p className="text-4xl font-bold">{money(p.price)}</p>
             {pm.pix && <p className="text-sm text-success-strong">à vista no Pix</p>}
-            <p className="mt-4 font-semibold text-success-strong">Frete grátis para Montes Claros e região (até {shippingConfig.freeShippingRadiusKm} km)</p>
-            <p className="mt-1 flex items-center gap-1 text-sm"><FullBadge /> — chega {shippingConfig.deliveryEstimateText}</p>
+            <p className="mt-4 font-semibold text-success-strong">Frete grátis para Montes Claros e região (até {radius} km)</p>
+            <p className="mt-1 flex items-center gap-1 text-sm"><FullBadge /> — chega {s.delivery_estimate_text}</p>
             <p className="mt-4 font-semibold">{p.stock > 0 ? "Estoque disponível" : "Sem estoque no momento"}</p>
             {p.stock > 0 && p.stock <= 3 && <p className="text-sm font-semibold text-primary">Últimas unidades</p>}
             <label className="mt-3 flex items-center gap-2 text-sm">Quantidade:
@@ -139,22 +145,22 @@ function ProductPage() {
           </Section>
           <Section title="Como funciona a entrega">
             <ul className="space-y-2 text-muted-foreground">
-              <li className="flex gap-2"><Zap className="h-5 w-5 shrink-0 text-success-strong" /><span><strong className="text-foreground">Frete grátis até {shippingConfig.freeShippingRadiusKm} km</strong> de Montes Claros, com entrega {shippingConfig.deliveryEstimateText}.</span></li>
+              <li className="flex gap-2"><Zap className="h-5 w-5 shrink-0 text-success-strong" /><span><strong className="text-foreground">Frete grátis até {radius} km</strong> de Montes Claros, com entrega {s.delivery_estimate_text}.</span></li>
               <li className="flex gap-2"><Store className="h-5 w-5 shrink-0 text-primary" /><span><strong className="text-foreground">Retirada na loja grátis</strong> — {store.address}.</span></li>
               <li className="flex gap-2"><ShieldCheck className="h-5 w-5 shrink-0 text-primary" /><span>Mais longe? O frete é combinado com a loja.</span></li>
             </ul>
           </Section>
           {pm.payOnDelivery && (
             <Section title="Como funciona o pagamento na entrega">
-              <p className="text-muted-foreground">Você só paga quando a moto chega. Na hora, escolha: {paymentConfig.payOnDeliveryMethods.join(", ").toLowerCase()}. Válido para entregas até {shippingConfig.payOnDeliveryMaxKm} km da loja.</p>
+              <p className="text-muted-foreground">Você só paga quando a moto chega. Na hora, escolha: {s.cod_methods.join(", ").toLowerCase()}. Válido para entregas até {s.pay_on_delivery_max_km} km da loja.</p>
             </Section>
           )}
           <Section title="Perguntas frequentes">
             <Accordion type="single" collapsible>
-              <Faq q="Como pago?" a={`Você pode pagar ${[pm.pix && "no Pix (aprovação na hora)", pm.payOnDelivery && "na entrega", pm.card && "no cartão de crédito"].filter(Boolean).join(", ")}. Se retirar, pode pagar na loja.`} />
+              <Faq q="Como pago?" a={`Você pode pagar ${[pm.pix && "no Pix (aprovação na hora)", pm.payOnDelivery && "na entrega", pm.card && "no cartão de crédito (pelo checkout seguro da Vega)"].filter(Boolean).join(", ")}. Se retirar, pode pagar na loja.`} />
               <Faq q="Posso retirar na loja?" a={`Sim, é grátis. A loja fica na ${store.address}, ${store.addressReference.toLowerCase()}.`} />
-              <Faq q="Entregam na minha cidade?" a={`Entregamos com frete grátis até ${shippingConfig.freeShippingRadiusKm} km de Montes Claros. Calcule pelo CEP acima; acima disso, o frete é combinado com a loja.`} />
-              <Faq q="Posso pagar na entrega?" a={`Sim, para entregas até ${shippingConfig.payOnDeliveryMaxKm} km da loja. Formas aceitas: ${paymentConfig.payOnDeliveryMethods.join(", ")}.`} />
+              <Faq q="Entregam na minha cidade?" a={`Entregamos com frete grátis até ${radius} km de Montes Claros. Calcule pelo CEP acima; acima disso, o frete é combinado com a loja.`} />
+              <Faq q="Posso pagar na entrega?" a={s.cod_enabled ? `Sim, para entregas até ${s.pay_on_delivery_max_km} km da loja. Formas aceitas: ${s.cod_methods.join(", ")}.` : "No momento, não."} />
             </Accordion>
           </Section>
         </div>
@@ -169,7 +175,7 @@ function ProductPage() {
       <Footer />
 
       <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-border bg-card p-3 shadow-card-hover md:hidden">
-        <div className="min-w-0"><p className="text-xl font-bold leading-none">{money(p.price)}</p><p className="text-xs text-success-strong">Frete grátis até {shippingConfig.freeShippingRadiusKm} km</p></div>
+        <div className="min-w-0"><p className="text-xl font-bold leading-none">{money(p.price)}</p><p className="text-xs text-success-strong">Frete grátis até {radius} km</p></div>
         <Button variant="buy" className="ml-auto h-12 flex-1" onClick={buy} disabled={p.stock < 1}>Comprar agora</Button>
       </div>
     </div>

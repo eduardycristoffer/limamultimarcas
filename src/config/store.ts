@@ -1,4 +1,5 @@
-// Todos os números de negócio da loja ficam aqui. Edite só este arquivo.
+// Valores PADRÃO da loja. Na Fase 2 os valores vivos vêm do painel admin (store_settings);
+// estes servem só de semente/fallback enquanto as configurações carregam.
 export const store = {
   name: "Lima Multimarcas",
   city: "Montes Claros/MG",
@@ -27,7 +28,3 @@ export const paymentConfig = {
 
 export const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Av. João XXIII, 990, Montes Claros - MG")}`;
 
-export function whatsappLink(text: string): string | null {
-  if (!store.whatsappNumber) return null;
-  return `https://wa.me/${store.whatsappNumber}?text=${encodeURIComponent(text)}`;
-}

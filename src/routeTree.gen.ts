@@ -10,18 +10,35 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as MotoSlugRouteImport } from './routes/moto.$slug'
 import { Route as PedidoIdRouteImport } from './routes/pedido.$id'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminConfiguracoesRouteImport } from './routes/_authenticated/admin.configuracoes'
+import { Route as AuthenticatedAdminPedidosRouteImport } from './routes/_authenticated/admin.pedidos'
+import { Route as AuthenticatedAdminProdutosRouteImport } from './routes/_authenticated/admin.produtos'
+import { Route as ApiPublicVegaWebhookRouteImport } from './routes/api/public/vega-webhook'
+import { Route as AuthenticatedAdminPedidoNumeroRouteImport } from './routes/_authenticated/admin.pedido.$numero'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckoutRoute = CheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MotoSlugRoute = MotoSlugRouteImport.update({
@@ -34,39 +51,133 @@ const PedidoIdRoute = PedidoIdRouteImport.update({
   path: '/pedido/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminConfiguracoesRoute =
+  AuthenticatedAdminConfiguracoesRouteImport.update({
+    id: '/admin/configuracoes',
+    path: '/admin/configuracoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminPedidosRoute =
+  AuthenticatedAdminPedidosRouteImport.update({
+    id: '/admin/pedidos',
+    path: '/admin/pedidos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminProdutosRoute =
+  AuthenticatedAdminProdutosRouteImport.update({
+    id: '/admin/produtos',
+    path: '/admin/produtos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiPublicVegaWebhookRoute = ApiPublicVegaWebhookRouteImport.update({
+  id: '/api/public/vega-webhook',
+  path: '/api/public/vega-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAdminPedidoNumeroRoute =
+  AuthenticatedAdminPedidoNumeroRouteImport.update({
+    id: '/admin/pedido/$numero',
+    path: '/admin/pedido/$numero',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
+  '/admin/login': typeof AdminLoginRoute
   '/moto/$slug': typeof MotoSlugRoute
   '/pedido/$id': typeof PedidoIdRoute
+  '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
+  '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
+  '/admin/produtos': typeof AuthenticatedAdminProdutosRoute
+  '/api/public/vega-webhook': typeof ApiPublicVegaWebhookRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/admin/pedido/$numero': typeof AuthenticatedAdminPedidoNumeroRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
+  '/admin/login': typeof AdminLoginRoute
   '/moto/$slug': typeof MotoSlugRoute
   '/pedido/$id': typeof PedidoIdRoute
+  '/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
+  '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
+  '/admin/produtos': typeof AuthenticatedAdminProdutosRoute
+  '/api/public/vega-webhook': typeof ApiPublicVegaWebhookRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
+  '/admin/pedido/$numero': typeof AuthenticatedAdminPedidoNumeroRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
+  '/admin/login': typeof AdminLoginRoute
   '/moto/$slug': typeof MotoSlugRoute
   '/pedido/$id': typeof PedidoIdRoute
+  '/_authenticated/admin/configuracoes': typeof AuthenticatedAdminConfiguracoesRoute
+  '/_authenticated/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
+  '/_authenticated/admin/produtos': typeof AuthenticatedAdminProdutosRoute
+  '/api/public/vega-webhook': typeof ApiPublicVegaWebhookRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/admin/pedido/$numero': typeof AuthenticatedAdminPedidoNumeroRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/checkout' | '/moto/$slug' | '/pedido/$id'
+  fullPaths:
+    | '/'
+    | '/checkout'
+    | '/admin/login'
+    | '/moto/$slug'
+    | '/pedido/$id'
+    | '/admin/configuracoes'
+    | '/admin/pedidos'
+    | '/admin/produtos'
+    | '/api/public/vega-webhook'
+    | '/admin/'
+    | '/admin/pedido/$numero'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/checkout' | '/moto/$slug' | '/pedido/$id'
-  id: '__root__' | '/' | '/checkout' | '/moto/$slug' | '/pedido/$id'
+  to:
+    | '/'
+    | '/checkout'
+    | '/admin/login'
+    | '/moto/$slug'
+    | '/pedido/$id'
+    | '/admin/configuracoes'
+    | '/admin/pedidos'
+    | '/admin/produtos'
+    | '/api/public/vega-webhook'
+    | '/admin'
+    | '/admin/pedido/$numero'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/checkout'
+    | '/admin/login'
+    | '/moto/$slug'
+    | '/pedido/$id'
+    | '/_authenticated/admin/configuracoes'
+    | '/_authenticated/admin/pedidos'
+    | '/_authenticated/admin/produtos'
+    | '/api/public/vega-webhook'
+    | '/_authenticated/admin/'
+    | '/_authenticated/admin/pedido/$numero'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
+  AdminLoginRoute: typeof AdminLoginRoute
   MotoSlugRoute: typeof MotoSlugRoute
   PedidoIdRoute: typeof PedidoIdRoute
+  ApiPublicVegaWebhookRoute: typeof ApiPublicVegaWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -78,11 +189,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout': {
       id: '/checkout'
       path: '/checkout'
       fullPath: '/checkout'
       preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/moto/$slug': {
@@ -99,14 +224,78 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PedidoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/configuracoes': {
+      id: '/_authenticated/admin/configuracoes'
+      path: '/admin/configuracoes'
+      fullPath: '/admin/configuracoes'
+      preLoaderRoute: typeof AuthenticatedAdminConfiguracoesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/pedidos': {
+      id: '/_authenticated/admin/pedidos'
+      path: '/admin/pedidos'
+      fullPath: '/admin/pedidos'
+      preLoaderRoute: typeof AuthenticatedAdminPedidosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/produtos': {
+      id: '/_authenticated/admin/produtos'
+      path: '/admin/produtos'
+      fullPath: '/admin/produtos'
+      preLoaderRoute: typeof AuthenticatedAdminProdutosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/vega-webhook': {
+      id: '/api/public/vega-webhook'
+      path: '/api/public/vega-webhook'
+      fullPath: '/api/public/vega-webhook'
+      preLoaderRoute: typeof ApiPublicVegaWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin/pedido/$numero': {
+      id: '/_authenticated/admin/pedido/$numero'
+      path: '/admin/pedido/$numero'
+      fullPath: '/admin/pedido/$numero'
+      preLoaderRoute: typeof AuthenticatedAdminPedidoNumeroRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminConfiguracoesRoute: typeof AuthenticatedAdminConfiguracoesRoute
+  AuthenticatedAdminPedidosRoute: typeof AuthenticatedAdminPedidosRoute
+  AuthenticatedAdminProdutosRoute: typeof AuthenticatedAdminProdutosRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+  AuthenticatedAdminPedidoNumeroRoute: typeof AuthenticatedAdminPedidoNumeroRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminConfiguracoesRoute: AuthenticatedAdminConfiguracoesRoute,
+  AuthenticatedAdminPedidosRoute: AuthenticatedAdminPedidosRoute,
+  AuthenticatedAdminProdutosRoute: AuthenticatedAdminProdutosRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  AuthenticatedAdminPedidoNumeroRoute: AuthenticatedAdminPedidoNumeroRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
+  AdminLoginRoute: AdminLoginRoute,
   MotoSlugRoute: MotoSlugRoute,
   PedidoIdRoute: PedidoIdRoute,
+  ApiPublicVegaWebhookRoute: ApiPublicVegaWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

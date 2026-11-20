@@ -4,12 +4,15 @@ import { Header } from "@/components/lima/Header";
 import { Footer } from "@/components/lima/Footer";
 import { ProductCard } from "@/components/lima/ProductCard";
 import { OfferBadge } from "@/components/lima/Badges";
-import { products } from "@/data/products";
-import { mapsUrl, store, shippingConfig } from "@/config/store";
+import { mapsUrl, store } from "@/config/store";
+import { catalogQuery, settingsQuery, useProducts, useSettings } from "@/lib/api";
 import { money } from "@/lib/format";
 
 export const Route = createFileRoute("/")({
   validateSearch: (s: Record<string, unknown>): { q?: string | undefined } => ({ q: typeof s["q"] === "string" && s["q"] ? s["q"].slice(0, 80) : undefined }),
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(catalogQuery), context.queryClient.ensureQueryData(settingsQuery)]),
+  errorComponent: () => <div className="p-10 text-center">Não conseguimos carregar a loja agora. Atualize a página.</div>,
+  notFoundComponent: () => <div className="p-10 text-center">Página não encontrada.</div>,
   head: () => ({
     meta: [
       { title: "Lima Multimarcas — Motos elétricas em Montes Claros/MG" },
@@ -27,20 +30,22 @@ const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").t
 
 function Home() {
   const { q } = Route.useSearch();
+  const products = useProducts();
+  const settings = useSettings();
   const list = q ? products.filter((p) => norm(`${p.name} ${p.color} ${p.highlights.join(" ")}`).includes(norm(q))) : products;
-  const featured = products[1]!;
+  const featured = products.find((p) => p.slug === "cappuccino") ?? products[0];
   return (
     <div className="min-h-screen bg-background">
       <Header key={q} initialQuery={q ?? ""} />
       <div className="border-b border-border bg-card">
         <ul className="mx-auto grid max-w-6xl grid-cols-1 gap-2 px-4 py-3 text-sm sm:grid-cols-3">
-          <li className="flex items-center gap-2"><Truck className="h-5 w-5 shrink-0 text-success-strong" />Frete grátis até {shippingConfig.freeShippingRadiusKm} km de Montes Claros</li>
+          <li className="flex items-center gap-2"><Truck className="h-5 w-5 shrink-0 text-success-strong" />Frete grátis até {settings.free_shipping_radius_km} km de Montes Claros</li>
           <li className="flex items-center gap-2"><HandCoins className="h-5 w-5 shrink-0 text-primary" />Pague na entrega</li>
-          <li className="flex items-center gap-2"><QrCode className="h-5 w-5 shrink-0 text-primary" />Pix</li>
+          {settings.pix_available && <li className="flex items-center gap-2"><QrCode className="h-5 w-5 shrink-0 text-primary" />Pix</li>}
         </ul>
       </div>
 
-      <section className="bg-hero-gradient text-ink-foreground">
+      {featured && <section className="bg-hero-gradient text-ink-foreground">
         <div className="mx-auto grid max-w-6xl items-center gap-6 px-4 py-10 md:grid-cols-2 md:py-14">
           <div>
             <OfferBadge>Oferta de inauguração</OfferBadge>
@@ -52,7 +57,7 @@ function Home() {
           </div>
           <img src={featured.images.cut} alt={`${featured.name} verde-menta com baú traseiro`} width={720} height={720} className="mx-auto max-h-96 w-full object-contain" />
         </div>
-      </section>
+      </section>}
 
       <main id="produtos" className="mx-auto max-w-6xl px-4 py-8">
         <h2 className="mb-4 text-xl font-semibold">{q ? `Resultados para “${q}”` : "Ofertas da Lima"}</h2>

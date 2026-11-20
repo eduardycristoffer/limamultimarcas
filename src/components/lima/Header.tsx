@@ -2,13 +2,13 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Search } from "lucide-react";
 import { useState } from "react";
 import logo from "@/assets/logo-lima.png.asset.json";
-import { whatsappLink } from "@/config/store";
+import { useSettings, waLink } from "@/lib/api";
 import { WhatsAppIcon } from "./WhatsAppIcon";
 
 export function Header({ initialQuery = "" }: { initialQuery?: string }) {
   const [q, setQ] = useState(initialQuery);
   const navigate = useNavigate();
-  const wa = whatsappLink("Olá, Lima! Vim pelo site.");
+  const wa = waLink(useSettings().whatsapp_number, "Olá, Lima! Vim pelo site.");
   return (
     <header className="bg-ink text-ink-foreground">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
