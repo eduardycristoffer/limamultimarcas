@@ -45,9 +45,9 @@ const F = ({ id, label, hint, children }: { id: string; label: string; hint?: st
 function useSaveSettings() {
   const save = useServerFn(adminSaveSettings);
   const qc = useQueryClient();
-  return async (data: Parameters<typeof save>[0]["data"]) => {
+  return async (data: Partial<Omit<S, "id" | "updated_at" | "vega_base_url" | "vega_domain">>) => {
     try {
-      const r = await save({ data });
+      const r = await save({ data: data as never });
       if (r.ok) { toast.success("Configurações salvas."); qc.invalidateQueries({ queryKey: ["admin"] }); qc.invalidateQueries({ queryKey: ["settings"] }); }
       else toast.error(r.error ?? "Erro ao salvar.");
     } catch { toast.error("Confira os campos e tente de novo."); }
