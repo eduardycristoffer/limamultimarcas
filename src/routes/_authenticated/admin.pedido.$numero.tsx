@@ -36,6 +36,7 @@ function OrderDetail() {
         const o = q.data.order; const st = o.status as OrderStatus;
         const timeline = [
           { at: o.created_at, label: "Pedido criado" },
+          o.deposit_paid_at && { at: o.deposit_paid_at, label: `Sinal de ${money(o.deposit_cents)} pago` },
           o.paid_at && { at: o.paid_at, label: "Pagamento confirmado" },
           o.delivered_at && { at: o.delivered_at, label: "Entregue" },
           o.canceled_at && { at: o.canceled_at, label: "Cancelado" },
@@ -47,7 +48,8 @@ function OrderDetail() {
               <Card title="Situação">
                 <div className="flex flex-wrap items-center gap-2"><StatusBadge status={o.status} /><span className="text-sm text-muted-foreground">{METHOD_LABEL[o.payment_method]}{o.cod_method ? ` · ${o.cod_method}` : ""}</span></div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {canTransition(st, "pago") && <Button variant="buy" className="h-11" onClick={() => act("pago")}>Marcar como pago</Button>}
+                  {canTransition(st, "pago") && <Button variant="buy" className="h-11" onClick={() => act("pago")}>{st === "aguardando_entrega" || st === "aguardando_retirada" ? "Recebi o restante" : "Marcar como pago"}</Button>}
+                  {st === "aguardando_sinal" && <Button variant="buy" className="h-11" onClick={() => act("pago")}>Sinal recebido</Button>}
                   {canTransition(st, "entregue") && <Button variant="ink" className="h-11" onClick={() => act("entregue")}>Entregue</Button>}
                   {canTransition(st, "cancelado") && (
                     <AlertDialog>
@@ -76,6 +78,10 @@ function OrderDetail() {
                   <div className="flex justify-between"><dt>Subtotal</dt><dd>{money(o.subtotal_cents)}</dd></div>
                   <div className="flex justify-between"><dt>Frete</dt><dd>{o.freight_mode === "arrange" ? "A combinar" : money(o.freight_cents)}</dd></div>
                   <div className="flex justify-between font-bold"><dt>Total</dt><dd>{money(o.total_cents)}</dd></div>
+                  {o.deposit_cents > 0 && <>
+                    <div className="flex justify-between"><dt>Sinal no Pix {o.deposit_paid_at ? "(pago)" : "(pendente)"}</dt><dd>{money(o.deposit_cents)}</dd></div>
+                    <div className="flex justify-between font-semibold text-primary"><dt>Receber na entrega/retirada</dt><dd>{money(o.balance_cents)}</dd></div>
+                  </>}
                 </dl>
                 {o.vega_transaction_token && <p className="mt-2 break-all text-xs text-muted-foreground">Vega: {o.vega_transaction_token} ({o.vega_status ?? "—"})</p>}
                 {(o.utm_source || o.src) && <p className="mt-1 text-xs text-muted-foreground">Origem: {[o.utm_source, o.utm_medium, o.utm_campaign, o.utm_content, o.utm_term, o.src].filter(Boolean).join(" / ")}</p>}

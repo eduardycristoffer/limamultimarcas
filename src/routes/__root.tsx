@@ -16,6 +16,10 @@ import { captureTracking } from "../lib/checkout-store";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import logo from "@/assets/logo-lima.png.asset.json";
+import { LocationSheetHost } from "@/components/ml/LocationSheet";
+import { ConsentBanner } from "@/components/ml/ConsentBanner";
+import { startDeliveryLocation } from "@/lib/location";
+import { captureFbclid, track } from "@/lib/meta-pixel";
 
 function NotFoundComponent() {
   return (
@@ -93,7 +97,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.png", type: "image/png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" },
     ],
   }),
   shellComponent: RootShell,
@@ -119,7 +123,12 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
-  useEffect(() => { captureTracking(); }, []);
+  useEffect(() => { captureTracking(); captureFbclid(); startDeliveryLocation(); }, []);
+  useEffect(() => {
+    // O primeiro PageView é enviado pelo próprio Pixel ao carregar; aqui contamos as trocas de página.
+    let first = true;
+    return router.subscribe("onResolved", () => { if (first) { first = false; return; } track("PageView"); });
+  }, [router]);
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
@@ -133,6 +142,8 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <LocationSheetHost />
+      <ConsentBanner />
       <Toaster />
     </QueryClientProvider>
   );

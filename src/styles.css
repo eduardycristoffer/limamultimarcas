@@ -65,6 +65,11 @@
   --color-success-strong: var(--success-strong);
   --color-success-foreground: var(--success-foreground);
   --color-link: var(--link);
+  --color-hot: var(--hot);
+  --color-hot-foreground: var(--hot-foreground);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-primary-soft: var(--primary-soft);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --shadow-card: var(--shadow-card);
   --shadow-card-hover: var(--shadow-card-hover);
@@ -83,35 +88,41 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Paleta no padrão do app do Mercado Livre, com o vermelho Lima (#E3000F) no lugar do amarelo. */
 :root {
-  --radius: 0.5rem;
-  --background: oklch(0.9459 0 0);
-  --foreground: oklch(0.18 0.005 285);
+  --radius: 0.375rem;
+  --background: oklch(0.9459 0 0); /* #EDEDED */
+  --foreground: oklch(0.22 0 0); /* ~rgba(0,0,0,.9) */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.005 285);
+  --card-foreground: oklch(0.22 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.005 285);
-  --primary: oklch(0.585 0.236 28.5);
-  --primary-hover: oklch(0.52 0.21 28.5);
+  --popover-foreground: oklch(0.22 0 0);
+  --primary: oklch(0.5756 0.2353 28.11); /* #E3000F exato */
+  --primary-hover: oklch(0.515 0.21 28.11);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.96 0 0);
-  --secondary-foreground: oklch(0.18 0.005 285);
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.5 0.008 285);
-  --accent: oklch(0.96 0.02 28);
-  --accent-foreground: oklch(0.45 0.18 28);
+  --primary-soft: oklch(0.955 0.03 25); /* fundo do botão secundário */
+  --secondary: oklch(0.965 0 0);
+  --secondary-foreground: oklch(0.22 0 0);
+  --muted: oklch(0.965 0 0);
+  --muted-foreground: oklch(0.52 0 0); /* ~rgba(0,0,0,.55) */
+  --accent: oklch(0.955 0.03 25);
+  --accent-foreground: oklch(0.47 0.19 28);
   --destructive: oklch(0.55 0.22 27);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.9 0 0);
-  --input: oklch(0.82 0 0);
-  --ring: oklch(0.585 0.236 28.5);
+  --border: oklch(0.92 0 0);
+  --line: oklch(0.94 0 0);
+  --input: oklch(0.8 0 0);
+  --ring: oklch(0.58 0.17 258);
+  --surface: oklch(0.965 0 0); /* caixas cinza (quantidade, cupom) */
   --ink: oklch(0.16 0.005 285);
   --ink-foreground: oklch(0.98 0 0);
   --ink-muted: oklch(0.75 0.005 285);
-  --success: oklch(0.62 0.16 152);
-  --success-strong: oklch(0.52 0.14 152);
+  --success: oklch(0.63 0.17 150); /* #00A650 */
+  --success-strong: oklch(0.54 0.15 150); /* verde legível em texto pequeno */
   --success-foreground: oklch(1 0 0);
-  --link: oklch(0.5 0.15 258);
+  --link: oklch(0.55 0.17 258); /* azul de link, versão legível */
+  --hot: oklch(0.66 0.19 45); /* laranja do selo, como "MAIS VENDIDO" */
+  --hot-foreground: oklch(1 0 0);
   --gradient-hero: linear-gradient(115deg, oklch(0.16 0.005 285) 0%, oklch(0.16 0.005 285) 40%, oklch(0.32 0.13 27) 100%);
   --gradient-overlay: linear-gradient(90deg, oklch(0 0 0 / 0.72) 0%, oklch(0 0 0 / 0.35) 50%, transparent 80%);
   --shadow-card: 0 1px 2px oklch(0 0 0 / 0.08), 0 4px 12px oklch(0 0 0 / 0.04);
@@ -145,7 +156,10 @@
 @utility bg-hero-gradient { background-image: var(--gradient-hero); }
 @utility bg-hero-overlay { background-image: var(--gradient-overlay); }
 @utility focus-ring { &:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; } }
+@utility no-scrollbar { scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+@utility pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
 @layer base {
-  html { font-family: var(--font-sans); }
-  a:focus-visible, button:focus-visible, input:focus-visible, [role="radio"]:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+  html { font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; }
+  body { font-size: 15px; line-height: 1.35; -webkit-font-smoothing: antialiased; }
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, [role="radio"]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 }

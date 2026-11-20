@@ -1,10 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeader } from "@tanstack/react-start/server";
+import { getRequest, getRequestHeader } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
 import { isValidCpf, onlyDigits } from "./format";
-import { maskCpfPublic, newOrderNumber, newToken, paymentAvailability, timingSafeEqualStr, type PaymentMethod } from "./order-rules";
+import {
+  AWAITING_PIX, depositFor, freightFor, maskCpfPublic, newOrderNumber, newToken, paymentAvailability, sanitizeRates, timingSafeEqualStr,
+  type FreightMode, type InstallmentRates, type PaymentMethod,
+} from "./order-rules";
 import { getProduct } from "@/data/products";
 
 function publicClient() {
@@ -32,16 +35,30 @@ export type PublicSettings = {
   whatsapp_number: string; free_shipping_radius_km: number; road_factor: number; pay_on_delivery_max_km: number;
   extra_km_price_cents: number | null; delivery_estimate_text: string;
   pix_available: boolean; card_enabled: boolean; cod_enabled: boolean; cod_methods: string[];
+  /** Sinal do "pague na entrega/na loja" em centavos (0 = sem sinal). */
+  deposit_cents: number;
+  /** A Vega está pronta para cobrar o sinal no Pix. */
+  deposit_available: boolean;
+  installments_max: number;
+  installment_rates: InstallmentRates;
+  meta_pixel_id: string;
+  /** Endereço público do site (para links absolutos de compartilhamento). */
+  site_url: string;
 };
 
 export const getPublicSettings = createServerFn({ method: "GET" }).handler(async (): Promise<PublicSettings> => {
   const { getSettings, vegaConfig } = await import("./store.server");
   const s = await getSettings();
   const v = await vegaConfig(s);
+  const vegaReady = v.ready && !!s.site_url;
   return {
     whatsapp_number: s.whatsapp_number, free_shipping_radius_km: Number(s.free_shipping_radius_km), road_factor: Number(s.road_factor),
     pay_on_delivery_max_km: Number(s.pay_on_delivery_max_km), extra_km_price_cents: s.extra_km_price_cents, delivery_estimate_text: s.delivery_estimate_text,
-    pix_available: s.pix_enabled && v.ready && !!s.site_url, card_enabled: s.card_enabled, cod_enabled: s.cod_enabled, cod_methods: s.cod_methods,
+    pix_available: s.pix_enabled && vegaReady, card_enabled: s.card_enabled, cod_enabled: s.cod_enabled, cod_methods: s.cod_methods,
+    deposit_cents: s.deposit_cents, deposit_available: vegaReady,
+    installments_max: s.installments_max, installment_rates: sanitizeRates(s.installment_rates),
+    meta_pixel_id: s.meta_pixel_id,
+    site_url: s.site_url.replace(/\/+$/, ""),
   };
 });
 
@@ -59,6 +76,34 @@ export const quoteShipping = createServerFn({ method: "POST" })
     try { return { ok: true as const, quote: await computeQuote(data.cep, shippingSettings(s)) }; }
     catch (e) { return { ok: false as const, error: e instanceof ShippingError ? e.message : "Não conseguimos calcular o frete agora." }; }
   });
+
+// ---------- Localização aproximada pelo IP ----------
+
+export type VisitorLocation = { city: string; uf: string; distanceKm: number | null; mode: FreightMode; codAvailable: boolean };
+type CfGeo = { city?: string; regionCode?: string; country?: string; latitude?: string | number; longitude?: string | number };
+
+/**
+ * Usa a geolocalização que o próprio Cloudflare (onde o site roda) anexa a cada requisição.
+ * Nenhum serviço de terceiros recebe o IP do visitante, e o IP não é gravado.
+ */
+export const getVisitorLocation = createServerFn({ method: "GET" }).handler(async (): Promise<VisitorLocation | null> => {
+  let geo: CfGeo | undefined;
+  try { geo = (getRequest() as Request & { cf?: CfGeo }).cf; } catch { geo = undefined; }
+  const city = decodeURIComponent(geo?.city ?? getRequestHeader("cf-ipcity") ?? "").trim();
+  const uf = (geo?.regionCode ?? getRequestHeader("cf-region-code") ?? "").trim().toUpperCase();
+  const country = (geo?.country ?? getRequestHeader("cf-ipcountry") ?? "").toUpperCase();
+  const lat = Number(geo?.latitude ?? getRequestHeader("cf-iplatitude"));
+  const lon = Number(geo?.longitude ?? getRequestHeader("cf-iplongitude"));
+  if (country !== "BR" || !city || uf.length !== 2) return null;
+  const { getSettings } = await import("./store.server");
+  const { haversineKm, ORIGIN } = await import("./shipping");
+  const s = shippingSettings(await getSettings());
+  const distanceKm = Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon) ? Math.round(haversineKm(ORIGIN, { lat, lon }) * s.road_factor) : null;
+  const { mode } = freightFor(distanceKm, s);
+  return { city, uf, distanceKm, mode, codAvailable: distanceKm != null && distanceKm <= s.pay_on_delivery_max_km };
+});
+
+// ---------- Pedido ----------
 
 const orderSchema = z.object({
   productSlug: z.string().min(1).max(60),
@@ -81,6 +126,7 @@ const orderSchema = z.object({
   }),
   payment: z.object({ method: z.enum(["pix", "cartao_vega", "pagar_na_entrega", "pagar_na_loja"]), codMethod: z.string().max(40).optional() }),
   tracking: z.record(z.string().max(200)).optional(),
+  meta: z.object({ consent: z.boolean(), fbp: z.string().max(200).optional(), fbc: z.string().max(400).optional() }).optional(),
   website: z.string().max(200).optional(), // honeypot
 });
 export type CreateOrderInput = z.input<typeof orderSchema>;
@@ -93,6 +139,7 @@ export const createOrder = createServerFn({ method: "POST" })
     if (data.website) return fail("Não foi possível concluir o pedido.");
     const srv = await import("./store.server");
     const { computeQuote } = await import("./shipping");
+    const { purchaseEventId } = await import("./meta.server");
     const db = srv.db;
 
     const ip = (getRequestHeader("cf-connecting-ip") || getRequestHeader("x-forwarded-for") || "unknown").split(",")[0]!.trim();
@@ -106,31 +153,41 @@ export const createOrder = createServerFn({ method: "POST" })
 
     const s = await srv.getSettings();
     const vega = await srv.vegaConfig(s);
+    const vegaReady = vega.ready && !!s.site_url;
     const quote = await computeQuote(data.delivery.cep, shippingSettings(s)).catch(() => null);
     if (data.delivery.method === "full" && (!quote || quote.mode === "unknown")) return fail("Não conseguimos calcular a entrega para esse CEP. Escolha retirar na loja.");
 
     const avail = paymentAvailability({
-      pixEnabled: s.pix_enabled && !!s.site_url, cardEnabled: s.card_enabled, codEnabled: s.cod_enabled, vegaConfigured: vega.ready,
-      productCardUrl: product.vega_checkout_url, delivery: data.delivery.method, distanceKm: quote?.distanceKm ?? null, payOnDeliveryMaxKm: Number(s.pay_on_delivery_max_km),
+      pixEnabled: s.pix_enabled, cardEnabled: s.card_enabled, codEnabled: s.cod_enabled, vegaConfigured: vegaReady,
+      productCardUrl: product.vega_checkout_url, delivery: data.delivery.method, distanceKm: quote?.distanceKm ?? null,
+      payOnDeliveryMaxKm: Number(s.pay_on_delivery_max_km), depositCents: s.deposit_cents,
     });
     const pm = data.payment.method as PaymentMethod;
     if (!avail[pm].ok) return fail(avail[pm].reason ?? "Forma de pagamento indisponível.");
-    if ((pm === "pagar_na_entrega" || pm === "pagar_na_loja") && data.payment.codMethod && !s.cod_methods.includes(data.payment.codMethod)) return fail("Forma de pagamento na entrega inválida.");
+    const isCod = pm === "pagar_na_entrega" || pm === "pagar_na_loja";
+    if (isCod && data.payment.codMethod && !s.cod_methods.includes(data.payment.codMethod)) return fail("Forma de pagamento na entrega inválida.");
 
     const freight = data.delivery.method === "full" ? quote!.freightCents ?? 0 : 0;
     const subtotal = product.price_cents * data.quantity;
-    const reserveNow = pm === "pagar_na_entrega" || pm === "pagar_na_loja";
+    const total = subtotal + freight;
+    const deposit = isCod ? depositFor(total, s.deposit_cents) : 0;
+    const reserveNow = isCod && deposit === 0;
     if (reserveNow) {
       const { data: ok } = await db.rpc("adjust_stock", { _slug: product.slug, _delta: -data.quantity });
       if (!ok) return fail("Estoque insuficiente para essa quantidade.");
     }
+    const status = pm === "pix" || pm === "cartao_vega" ? "aguardando_pagamento"
+      : deposit > 0 ? "aguardando_sinal"
+      : pm === "pagar_na_entrega" ? "aguardando_entrega" : "aguardando_retirada";
     const t = data.tracking ?? {};
+    const consent = data.meta?.consent === true;
+    const orderNumber = newOrderNumber();
     const row = {
-      order_number: newOrderNumber(), public_token: newToken(),
-      status: pm === "pagar_na_entrega" ? "aguardando_entrega" : pm === "pagar_na_loja" ? "aguardando_retirada" : "aguardando_pagamento",
-      payment_method: pm, cod_method: reserveNow ? data.payment.codMethod ?? null : null,
+      order_number: orderNumber, public_token: newToken(), status,
+      payment_method: pm, cod_method: isCod ? data.payment.codMethod ?? null : null,
       product_slug: product.slug, product_name: product.name, unit_price_cents: product.price_cents, quantity: data.quantity,
-      subtotal_cents: subtotal, freight_cents: freight, freight_mode: data.delivery.method === "full" ? quote!.mode : "free", discount_cents: 0, total_cents: subtotal + freight,
+      subtotal_cents: subtotal, freight_cents: freight, freight_mode: data.delivery.method === "full" ? quote!.mode : "free", discount_cents: 0, total_cents: total,
+      deposit_cents: deposit, balance_cents: isCod ? total - deposit : 0,
       customer_name: data.customer.name, customer_cpf: onlyDigits(data.customer.cpf), customer_email: data.customer.email.toLowerCase(), customer_phone: data.customer.phone,
       delivery_method: data.delivery.method, cep: onlyDigits(data.delivery.cep), street: data.delivery.street, number: data.delivery.number,
       complement: data.delivery.complement ?? null, district: data.delivery.district ?? quote?.address.district ?? null,
@@ -138,6 +195,11 @@ export const createOrder = createServerFn({ method: "POST" })
       utm_source: t["utm_source"] ?? null, utm_medium: t["utm_medium"] ?? null, utm_campaign: t["utm_campaign"] ?? null,
       utm_content: t["utm_content"] ?? null, utm_term: t["utm_term"] ?? null, src: t["src"] ?? null,
       stock_reserved: reserveNow,
+      // Dados para a API de Conversões da Meta: só guardados se o cliente aceitou os cookies.
+      tracking_consent: consent, meta_event_id: purchaseEventId(orderNumber),
+      fbp: consent ? data.meta?.fbp ?? null : null, fbc: consent ? data.meta?.fbc ?? null : null,
+      client_ip: consent && ip !== "unknown" ? ip : null,
+      client_user_agent: consent ? (getRequestHeader("user-agent") ?? "").slice(0, 400) || null : null,
     };
     const { data: order, error } = await db.from("orders").insert(row).select("*").single();
     if (error || !order) {
@@ -146,7 +208,7 @@ export const createOrder = createServerFn({ method: "POST" })
       return fail("Não foi possível registrar o pedido. Tente de novo.");
     }
 
-    if (pm === "pix") {
+    if (pm === "pix" || deposit > 0) {
       try {
         const secret = await srv.ensureWebhookSecret();
         const r = await srv.createVegaPix(order, { apiKey: vega.apiKey!, baseUrl: vega.baseUrl, domain: vega.domain, siteUrl: vega.siteUrl, webhookSecret: secret, description: stat.highlights.join(", "), imagePath: stat.images.studio });
@@ -170,9 +232,12 @@ export type PublicOrder = {
   orderNumber: string; status: string; paymentMethod: string; codMethod: string | null;
   productSlug: string; productName: string; quantity: number; unitPriceCents: number;
   subtotalCents: number; freightCents: number; freightMode: string | null; totalCents: number;
+  depositCents: number; balanceCents: number; depositPaidAt: string | null;
   customerName: string; customerCpf: string; deliveryMethod: string;
   address: { street: string | null; number: string | null; complement: string | null; district: string | null; city: string | null; uf: string | null; cep: string | null };
   pixCopyPaste: string | null; paidAt: string | null; createdAt: string;
+  /** Mesmo event_id do Purchase enviado pelo servidor (a Meta remove a duplicata). */
+  metaEventId: string | null; trackingConsent: boolean;
 };
 
 export const getOrderPublic = createServerFn({ method: "POST" })
@@ -185,9 +250,11 @@ export const getOrderPublic = createServerFn({ method: "POST" })
       orderNumber: o.order_number, status: o.status, paymentMethod: o.payment_method, codMethod: o.cod_method,
       productSlug: o.product_slug, productName: o.product_name, quantity: o.quantity, unitPriceCents: o.unit_price_cents,
       subtotalCents: o.subtotal_cents, freightCents: o.freight_cents, freightMode: o.freight_mode, totalCents: o.total_cents,
+      depositCents: o.deposit_cents, balanceCents: o.balance_cents, depositPaidAt: o.deposit_paid_at,
       customerName: o.customer_name.split(" ")[0] ?? "", customerCpf: maskCpfPublic(o.customer_cpf), deliveryMethod: o.delivery_method,
       address: { street: o.street, number: o.number, complement: o.complement, district: o.district, city: o.city, uf: o.uf, cep: o.cep },
-      pixCopyPaste: o.status === "aguardando_pagamento" ? o.pix_copy_paste : null, paidAt: o.paid_at, createdAt: o.created_at,
+      pixCopyPaste: (AWAITING_PIX as string[]).includes(o.status) ? o.pix_copy_paste : null, paidAt: o.paid_at, createdAt: o.created_at,
+      metaEventId: o.meta_event_id, trackingConsent: o.tracking_consent,
     };
   });
 

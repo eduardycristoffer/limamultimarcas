@@ -18,7 +18,7 @@ export const adminDashboard = createServerFn({ method: "GET" }).middleware([requ
   const base = () => sb.from("orders").select("id", { count: "exact", head: true });
   const [today, awaitingPay, toDeliver, paid] = await Promise.all([
     c((q) => q.gte("created_at", start.toISOString())),
-    c((q) => q.eq("status", "aguardando_pagamento")),
+    c((q) => q.in("status", ["aguardando_pagamento", "aguardando_sinal"])),
     c((q) => q.in("status", ["aguardando_entrega", "aguardando_retirada", "pago"]).is("delivered_at", null)),
     c((q) => q.eq("status", "pago")),
   ]);
@@ -96,6 +96,12 @@ export const adminSaveSettings = createServerFn({ method: "POST" }).middleware([
     extra_km_price_cents: z.number().int().min(0).max(100000).nullable(), delivery_estimate_text: z.string().trim().min(1).max(80),
     pix_enabled: z.boolean(), card_enabled: z.boolean(), cod_enabled: z.boolean(), cod_methods: z.array(z.string().trim().min(1).max(40)).max(10),
     site_url: z.union([httpsUrl, z.literal("")]),
+    deposit_cents: z.number().int().min(0).max(10_000_000),
+    installments_max: z.number().int().min(1).max(24),
+    installment_rates: z.record(z.string().regex(/^\d{1,2}$/), z.number().min(0).max(100))
+      .refine((r) => Object.keys(r).every((k) => Number(k) >= 1 && Number(k) <= 24), "Parcelas de 1 a 24"),
+    meta_pixel_id: z.string().trim().regex(/^\d{0,20}$/, "O ID do Pixel tem só números"),
+    meta_test_event_code: z.string().trim().max(40),
   }).partial().parse(d))
   .handler(async ({ data, context }) => {
     const patch = { ...data, ...(data.site_url !== undefined ? { site_url: data.site_url.replace(/\/+$/, "") } : {}), updated_at: new Date().toISOString() };
@@ -123,6 +129,22 @@ export const saveVegaCredentials = createServerFn({ method: "POST" }).middleware
     if (data.apiKey) await srv.setSecret("vega_api_key", data.apiKey);
     const { error } = await srv.db.from("store_settings").update({ vega_base_url: data.baseUrl.replace(/\/+$/, ""), vega_domain: data.domain.toLowerCase() }).eq("id", 1);
     return error ? { ok: false } : { ok: true };
+  });
+
+export const getMetaStatus = createServerFn({ method: "GET" }).middleware([requireAdmin]).handler(async () => {
+  const srv = await import("./store.server");
+  const s = await srv.getSettings();
+  const token = await srv.getSecret("meta_capi_token");
+  return { hasToken: !!token, last4: token ? token.slice(-4) : null, pixelId: s.meta_pixel_id, testCode: s.meta_test_event_code };
+});
+
+/** Token da API de Conversões: somente escrita, nunca volta para o navegador. */
+export const saveMetaToken = createServerFn({ method: "POST" }).middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ token: z.string().trim().min(20).max(600) }).parse(d))
+  .handler(async ({ data }) => {
+    const srv = await import("./store.server");
+    await srv.setSecret("meta_capi_token", data.token);
+    return { ok: true };
   });
 
 export const adminWebhookEvents = createServerFn({ method: "GET" }).middleware([requireAdmin]).handler(async ({ context }) => {

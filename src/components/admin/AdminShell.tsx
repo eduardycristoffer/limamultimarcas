@@ -56,7 +56,7 @@ export function AdminShell({ title, children }: { title: string; children: React
 }
 
 export const STATUS_LABEL: Record<string, string> = {
-  aguardando_pagamento: "Aguardando pagamento", pago: "Pago", recusado: "Recusado", expirado: "Expirado", estornado: "Estornado",
+  aguardando_sinal: "Aguardando sinal", aguardando_pagamento: "Aguardando pagamento", pago: "Pago", recusado: "Recusado", expirado: "Expirado", estornado: "Estornado",
   aguardando_entrega: "A entregar", aguardando_retirada: "A retirar", entregue: "Entregue", cancelado: "Cancelado",
 };
 export const METHOD_LABEL: Record<string, string> = { pix: "Pix", cartao_vega: "Cartão (Vega)", pagar_na_entrega: "Pagar na entrega", pagar_na_loja: "Pagar na loja" };

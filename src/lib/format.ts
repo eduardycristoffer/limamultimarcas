@@ -3,6 +3,9 @@ const brlInt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BR
 /** Formata centavos. Valores inteiros saem sem centavos (R$ 7.990). */
 export const money = (cents: number) => (cents % 100 === 0 ? brlInt : brl).format(cents / 100);
 export const onlyDigits = (s: string) => s.replace(/\D/g, "");
+/** ["Dinheiro","Pix","Cartão (maquininha)"] → "dinheiro, Pix ou cartão (maquininha)". */
+export const orList = (items: string[]) =>
+  new Intl.ListFormat("pt-BR", { type: "disjunction" }).format(items.map((m) => (/^pix$/i.test(m) ? "Pix" : m.charAt(0).toLowerCase() + m.slice(1))));
 export const maskCpf = (v: string) => onlyDigits(v).slice(0, 11).replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 export const maskPhone = (v: string) => {
   const d = onlyDigits(v).slice(0, 11);

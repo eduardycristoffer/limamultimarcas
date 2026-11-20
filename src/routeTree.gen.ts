@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as MotoSlugRouteImport } from './routes/moto.$slug'
 import { Route as PedidoIdRouteImport } from './routes/pedido.$id'
@@ -34,6 +35,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const CheckoutRoute = CheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
@@ -89,6 +95,7 @@ const AuthenticatedAdminPedidoNumeroRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/admin/login': typeof AdminLoginRoute
   '/moto/$slug': typeof MotoSlugRoute
   '/pedido/$id': typeof PedidoIdRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/admin/login': typeof AdminLoginRoute
   '/moto/$slug': typeof MotoSlugRoute
   '/pedido/$id': typeof PedidoIdRoute
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/admin/login': typeof AdminLoginRoute
   '/moto/$slug': typeof MotoSlugRoute
   '/pedido/$id': typeof PedidoIdRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/checkout'
+    | '/privacidade'
     | '/admin/login'
     | '/moto/$slug'
     | '/pedido/$id'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/checkout'
+    | '/privacidade'
     | '/admin/login'
     | '/moto/$slug'
     | '/pedido/$id'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/checkout'
+    | '/privacidade'
     | '/admin/login'
     | '/moto/$slug'
     | '/pedido/$id'
@@ -174,6 +186,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
   AdminLoginRoute: typeof AdminLoginRoute
   MotoSlugRoute: typeof MotoSlugRoute
   PedidoIdRoute: typeof PedidoIdRoute
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/checkout'
       fullPath: '/checkout'
       preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/login': {
@@ -292,6 +312,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
   AdminLoginRoute: AdminLoginRoute,
   MotoSlugRoute: MotoSlugRoute,
   PedidoIdRoute: PedidoIdRoute,

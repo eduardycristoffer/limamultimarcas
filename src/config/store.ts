@@ -1,5 +1,4 @@
-// Valores PADRÃO da loja. Na Fase 2 os valores vivos vêm do painel admin (store_settings);
-// estes servem só de semente/fallback enquanto as configurações carregam.
+// Valores padrão da loja. Os valores reais são editados no painel (/admin → Configurações).
 export const store = {
   name: "Lima Multimarcas",
   city: "Montes Claros/MG",
@@ -22,9 +21,14 @@ export const shippingConfig = {
 export const paymentConfig = {
   payments: { pix: true, card: false, payOnDelivery: true },
   payOnDeliveryMethods: ["Dinheiro", "Pix", "Cartão (maquininha)"],
-  /** null = não exibe parcelamento. */
-  maxInstallments: null as number | null,
+  /** Sinal no Pix para reservar no "pague na entrega" (centavos). */
+  depositCents: 30000,
+  installmentsMax: 18,
 };
 
 export const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Av. João XXIII, 990, Montes Claros - MG")}`;
 
+export function whatsappLink(text: string): string | null {
+  if (!store.whatsappNumber) return null;
+  return `https://wa.me/${store.whatsappNumber}?text=${encodeURIComponent(text)}`;
+}

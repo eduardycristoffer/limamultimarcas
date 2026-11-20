@@ -1,6 +1,6 @@
 // Somente servidor. Importar apenas com `await import()` dentro de handlers.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { canTransition, newToken, toVegaPhone, type OrderStatus } from "./order-rules";
+import { canTransition, newToken, resolveTarget, toVegaPhone, type OrderStatus } from "./order-rules";
 import type { Database } from "@/integrations/supabase/types";
 
 export const db = supabaseAdmin;
@@ -41,9 +41,10 @@ export function webhookUrl(siteUrl: string, secret: string) {
 }
 
 export type VegaPixResult = { transactionToken: string | null; paymentStatus: string | null; pixCopyPaste: string | null };
+type PixOpts = { siteUrl: string; webhookSecret: string; description: string; imagePath: string };
 
-/** Cria a cobrança Pix na Vega. `f` permite mock nos testes. */
-export async function createVegaPix(order: OrderRow, opts: { apiKey: string; baseUrl: string; domain: string; siteUrl: string; webhookSecret: string; description: string; imagePath: string }, f: typeof fetch = fetch): Promise<VegaPixResult> {
+/** Cria a cobrança Pix na Vega (pedido inteiro ou só o sinal). `f` permite mock nos testes. */
+export async function createVegaPix(order: OrderRow, opts: PixOpts & { apiKey: string; baseUrl: string; domain: string }, f: typeof fetch = fetch): Promise<VegaPixResult> {
   const body = buildVegaPixBody(order, opts);
   const res = await f(`${opts.baseUrl}/api/checkout`, {
     method: "POST",
@@ -60,33 +61,59 @@ export async function createVegaPix(order: OrderRow, opts: { apiKey: string; bas
   };
 }
 
-export function buildVegaPixBody(o: OrderRow, opts: { siteUrl: string; webhookSecret: string; description: string; imagePath: string }) {
+/**
+ * Corpo do POST /api/checkout conforme a documentação da Vega.
+ * Pedido com sinal (deposit_cents > 0): cobra só o sinal, como um item "Sinal de reserva".
+ */
+export function buildVegaPixBody(o: OrderRow, opts: PixOpts) {
   const img = opts.imagePath.startsWith("http") ? opts.imagePath : `${opts.siteUrl}${opts.imagePath}`;
+  const isDeposit = (o.deposit_cents ?? 0) > 0;
+  const products = isDeposit
+    ? [{ code: `${o.product_slug}-sinal`, name: `Sinal de reserva — ${o.product_name} (pedido ${o.order_number})`, price: o.deposit_cents, is_digital: false, quantity: 1,
+        description: `Sinal descontado do total. Restante na entrega/retirada: R$ ${(o.balance_cents / 100).toFixed(2).replace(".", ",")}`, image_url: img }]
+    : [{ code: o.product_slug, name: o.product_name, price: o.unit_price_cents, is_digital: false, quantity: o.quantity, description: opts.description, image_url: img }];
+  const payment = isDeposit
+    ? { method: "pix", payment_value: o.deposit_cents, freight_value: 0, discount_value: 0, external_code: o.order_number, currency: "BRL" }
+    : { method: "pix", payment_value: o.subtotal_cents + o.freight_cents - o.discount_cents, freight_value: o.freight_cents, discount_value: 0, external_code: o.order_number, currency: "BRL" };
   const body: Record<string, unknown> = {
     customer: {
       name: o.customer_name, document: o.customer_cpf.replace(/\D/g, ""), email: o.customer_email, phone: toVegaPhone(o.customer_phone),
       address: { street: o.street ?? "", number: o.number ?? "", district: o.district ?? "", zipcode: (o.cep ?? "").replace(/\D/g, ""), city: o.city ?? "", state: o.uf ?? "", complement: o.complement ?? "" },
     },
-    products: [{ code: o.product_slug, name: o.product_name, price: o.unit_price_cents, is_digital: false, quantity: o.quantity, description: opts.description, image_url: img }],
-    payment: { method: "pix", payment_value: o.subtotal_cents + o.freight_cents - o.discount_cents, freight_value: o.freight_cents, discount_value: 0, external_code: o.order_number, currency: "BRL" },
+    products,
+    payment,
     notification_url: `${opts.siteUrl}/api/public/vega-webhook?s=${opts.webhookSecret}`,
   };
   for (const k of ["src", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const) if (o[k]) body[k] = o[k];
   return body;
 }
 
-/** Aplica uma mudança de status respeitando transições e estoque. Idempotente. */
-export async function applyStatus(order: OrderRow, to: OrderStatus, extra: Partial<OrderRow> = {}): Promise<{ applied: boolean; order: OrderRow }> {
+async function notifyMeta(order: OrderRow) {
+  const { sendPurchase } = await import("./meta.server");
+  await sendPurchase(order, {
+    getSettings,
+    getSecret,
+    markSent: async (id) => { await db.from("orders").update({ capi_purchase_sent_at: new Date().toISOString() }).eq("id", id); },
+  });
+}
+
+/**
+ * Aplica uma mudança de status respeitando transições, estoque e sinal. Idempotente.
+ * "pago" num pedido com sinal vira "aguardando_entrega"/"aguardando_retirada" (o restante é pago na entrega).
+ */
+export async function applyStatus(order: OrderRow, requested: OrderStatus, extra: Partial<OrderRow> = {}): Promise<{ applied: boolean; order: OrderRow }> {
   const from = order.status as OrderStatus;
+  const to = resolveTarget(order, requested);
   if (!canTransition(from, to)) return { applied: false, order };
   const patch: Partial<OrderRow> = { ...extra, status: to };
   const notes: string[] = [];
-  if (to === "pago") {
-    patch.paid_at = new Date().toISOString();
-    if (!order.stock_reserved) {
-      const { data: ok } = await db.rpc("adjust_stock", { _slug: order.product_slug, _delta: -order.quantity });
-      if (ok) patch.stock_reserved = true; else notes.push("Pago sem estoque disponível para baixa — conferir.");
-    }
+  const depositPaid = from === "aguardando_sinal" && (to === "aguardando_entrega" || to === "aguardando_retirada");
+  const fullyPaid = to === "pago";
+  if (depositPaid) patch.deposit_paid_at = new Date().toISOString();
+  if (fullyPaid) patch.paid_at = new Date().toISOString();
+  if ((depositPaid || fullyPaid) && !order.stock_reserved) {
+    const { data: ok } = await db.rpc("adjust_stock", { _slug: order.product_slug, _delta: -order.quantity });
+    if (ok) patch.stock_reserved = true; else notes.push("Pago sem estoque disponível para baixa — conferir.");
   }
   if ((to === "cancelado" || to === "estornado") && order.stock_reserved) {
     await db.rpc("adjust_stock", { _slug: order.product_slug, _delta: order.quantity });
@@ -98,5 +125,6 @@ export async function applyStatus(order: OrderRow, to: OrderStatus, extra: Parti
   // Condição otimista no status atual evita corrida entre webhook e admin.
   const { data, error } = await db.from("orders").update(patch).eq("id", order.id).eq("status", from).select("*").maybeSingle();
   if (error || !data) return { applied: false, order };
+  if (depositPaid || fullyPaid) await notifyMeta(data);
   return { applied: true, order: data };
 }

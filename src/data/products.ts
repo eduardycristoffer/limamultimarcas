@@ -1,36 +1,41 @@
-import scooterStudio from "@/assets/scooter-500w-studio.jpg.asset.json";
-import scooterHero from "@/assets/scooter-500w-hero.jpg.asset.json";
-import scooterCut from "@/assets/scooter-500w-cut.png.asset.json";
-import capStudio from "@/assets/cappuccino-studio.jpg.asset.json";
-import capHero from "@/assets/cappuccino-hero.jpg.asset.json";
-import capCut from "@/assets/cappuccino-cut.png.asset.json";
-import gtStudio from "@/assets/foston-gt6x-studio.jpg.asset.json";
-import gtHero from "@/assets/foston-gt6x-hero.jpg.asset.json";
-import gtCut from "@/assets/foston-gt6x-cut.png.asset.json";
+// Conteúdo das motos. Preço, estoque e link do cartão vêm do banco (painel /admin → Produtos).
+// Ficha técnica: SOMENTE dados confirmados pela loja. Para acrescentar, edite `specs`.
 
 export type Product = {
   slug: string;
+  /** Nome curto (resumo, carrinho, WhatsApp). */
   name: string;
-  /** Preço em centavos */
+  /** Título do anúncio, no padrão Mercado Livre. */
+  title: string;
+  category: string;
+  /** Preço à vista em centavos (padrão; o banco manda o valor real). */
   price: number;
   color: string;
   condition: "Novo";
   highlights: string[];
-  /** Ficha técnica: somente dados confirmados. O dono pode acrescentar linhas aqui. */
+  /** Destaques curtos mostrados sobre a foto (ícone + texto). */
+  badges: { icon: "zap" | "battery" | "basket" | "seat" | "leaf" | "retro" | "box" | "light" | "disc"; label: string }[];
   specs: { label: string; value: string }[];
   stock: number;
   badge: string;
-  images: { studio: string; hero: string; cut: string };
+  images: { white: string; studio: string; street: string };
+  video: { src: string; poster: string };
 };
+
+const img = (slug: string) => ({ white: `/img/${slug}-branco.jpg`, studio: `/img/${slug}-estudio.jpg`, street: `/img/${slug}-rua.jpg` });
+const vid = (slug: string) => ({ src: `/videos/${slug}.mp4`, poster: `/videos/${slug}-poster.jpg` });
 
 export const products: Product[] = [
   {
     slug: "scooter-500w",
     name: "Scooter Elétrica 500 W",
+    title: "Scooter Elétrica 500W Preta com Cesta Dianteira e Encosto",
+    category: "Scooters elétricas",
     price: 399000,
     color: "Preta",
     condition: "Novo",
-    highlights: ["500 W de potência", "Cesta dianteira", "Encosto/banco com apoio", "Zero gasolina"],
+    highlights: ["Motor de 500 W de potência", "Cesta dianteira", "Banco com encosto", "Zero gasolina: você só carrega a bateria"],
+    badges: [{ icon: "zap", label: "500 W" }, { icon: "basket", label: "Cesta" }, { icon: "seat", label: "Encosto" }, { icon: "leaf", label: "Zero gasolina" }],
     specs: [
       { label: "Potência", value: "500 W" },
       { label: "Cesta dianteira", value: "Sim" },
@@ -38,15 +43,19 @@ export const products: Product[] = [
     ],
     stock: 10,
     badge: "Oferta de inauguração",
-    images: { studio: scooterStudio.url, hero: scooterHero.url, cut: scooterCut.url },
+    images: img("scooter-500w"),
+    video: vid("scooter-500w"),
   },
   {
     slug: "cappuccino",
     name: "Cappuccino",
+    title: "Scooter Elétrica Cappuccino Retrô Verde-menta Até 70 km com Baú",
+    category: "Scooters elétricas",
     price: 799000,
-    color: "Verde-menta (única cor disponível)",
+    color: "Verde-menta",
     condition: "Novo",
     highlights: ["Visual retrô", "Até 70 km de autonomia", "Baú traseiro", "Banco bege"],
+    badges: [{ icon: "battery", label: "Até 70 km" }, { icon: "retro", label: "Retrô" }, { icon: "box", label: "Baú" }, { icon: "leaf", label: "Zero gasolina" }],
     specs: [
       { label: "Autonomia", value: "Até 70 km" },
       { label: "Estilo", value: "Retrô" },
@@ -55,15 +64,19 @@ export const products: Product[] = [
     ],
     stock: 10,
     badge: "Oferta de inauguração",
-    images: { studio: capStudio.url, hero: capHero.url, cut: capCut.url },
+    images: img("cappuccino"),
+    video: vid("cappuccino"),
   },
   {
     slug: "foston-gt6x",
     name: "Foston GT6X",
+    title: "Scooter Elétrica Foston GT6X Até 60 km Farol LED Freio a Disco",
+    category: "Scooters elétricas",
     price: 999000,
     color: "Cinza/prata",
     condition: "Novo",
     highlights: ["Até 60 km de autonomia", "Farol em LED", "Freio a disco na roda dianteira"],
+    badges: [{ icon: "battery", label: "Até 60 km" }, { icon: "light", label: "Farol LED" }, { icon: "disc", label: "Freio a disco" }, { icon: "leaf", label: "Zero gasolina" }],
     specs: [
       { label: "Autonomia", value: "Até 60 km" },
       { label: "Farol", value: "LED" },
@@ -71,7 +84,8 @@ export const products: Product[] = [
     ],
     stock: 10,
     badge: "Oferta de inauguração",
-    images: { studio: gtStudio.url, hero: gtHero.url, cut: gtCut.url },
+    images: img("foston-gt6x"),
+    video: vid("foston-gt6x"),
   },
 ];
 

@@ -8,7 +8,9 @@ import { AdminShell, adminInput } from "@/components/admin/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { adminGetSettings, adminSaveSettings, adminWebhookEvents, getVegaStatus, saveVegaCredentials } from "@/lib/admin.functions";
+import { adminGetSettings, adminSaveSettings, adminWebhookEvents, getMetaStatus, getVegaStatus, saveMetaToken, saveVegaCredentials } from "@/lib/admin.functions";
+import { DEFAULT_RATES, installmentPlan, sanitizeRates } from "@/lib/order-rules";
+import { money } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/admin/configuracoes")({
   head: () => ({ meta: [{ title: "Configurações — Painel Lima" }, { name: "description", content: "Configurações da loja." }, { property: "og:title", content: "Configurações" }, { property: "og:description", content: "Painel" }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }] }),
@@ -22,14 +24,18 @@ function SettingsPage() {
     <AdminShell title="Configurações">
       {q.isPending ? <div className="h-40 animate-pulse rounded-lg bg-card" /> : q.isError ? <p className="text-destructive">Não foi possível carregar.</p> : (
         <Tabs defaultValue="vega">
-          <TabsList className="mb-4 grid h-auto w-full grid-cols-3">
-            <TabsTrigger value="vega" className="h-11">Vega Checkout</TabsTrigger>
-            <TabsTrigger value="pag" className="h-11">Pagamentos</TabsTrigger>
-            <TabsTrigger value="frete" className="h-11">Frete e loja</TabsTrigger>
+          <TabsList className="mb-4 flex h-auto w-full flex-wrap justify-start gap-1">
+            <TabsTrigger value="vega" className="h-11 flex-1">Vega Checkout</TabsTrigger>
+            <TabsTrigger value="pag" className="h-11 flex-1">Pagamentos</TabsTrigger>
+            <TabsTrigger value="parc" className="h-11 flex-1">Sinal e parcelas</TabsTrigger>
+            <TabsTrigger value="frete" className="h-11 flex-1">Frete e loja</TabsTrigger>
+            <TabsTrigger value="meta" className="h-11 flex-1">Meta</TabsTrigger>
           </TabsList>
           <TabsContent value="vega"><VegaTab siteUrl={q.data.site_url} /></TabsContent>
           <TabsContent value="pag"><PaymentsTab s={q.data} /></TabsContent>
+          <TabsContent value="parc"><InstallmentsTab s={q.data} /></TabsContent>
           <TabsContent value="frete"><ShippingTab s={q.data} /></TabsContent>
+          <TabsContent value="meta"><MetaTab s={q.data} /></TabsContent>
         </Tabs>
       )}
     </AdminShell>
@@ -149,6 +155,106 @@ function PaymentsTab({ s }: { s: S }) {
 const Toggle = ({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) => (
   <label className="flex items-start justify-between gap-4"><span><span className="block font-medium">{label}</span><span className="block text-sm text-muted-foreground">{hint}</span></span><Switch checked={checked} onCheckedChange={onChange} /></label>
 );
+
+function InstallmentsTab({ s }: { s: S }) {
+  const save = useSaveSettings();
+  const [deposit, setDeposit] = useState(String(s.deposit_cents / 100).replace(".", ","));
+  const [max, setMax] = useState(s.installments_max);
+  const [rates, setRates] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(sanitizeRates(s.installment_rates)).map(([k, v]) => [k, String(v).replace(".", ",")])));
+  const [preview, setPreview] = useState(799000);
+  const num = (v: string) => Number(v.replace(/\./g, "").replace(",", "."));
+  const parsed = Object.fromEntries(Object.entries(rates).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, num(v)]));
+  const plan = installmentPlan(preview, parsed, max);
+  const ns = Array.from({ length: Math.max(18, max) }, (_, i) => String(i + 1));
+  return (
+    <>
+      <Box title="Sinal do pague na entrega">
+        <F id="dep" label="Valor do sinal (R$)" hint="Cobrado no Pix pela Vega para reservar a moto. O restante é pago na entrega ou na retirada. 0 = sem sinal.">
+          <input id="dep" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} className={adminInput} />
+        </F>
+        <Button variant="buy" className="mt-3 h-11" onClick={() => {
+          const v = num(deposit); if (!Number.isFinite(v) || v < 0) return void toast.error("Valor inválido.");
+          save({ deposit_cents: Math.round(v * 100) });
+        }}>Salvar sinal</Button>
+      </Box>
+      <Box title="Parcelamento no cartão">
+        <p className="mb-3 text-sm text-muted-foreground">Acréscimo total sobre o preço à vista, por número de parcelas. Precisa ser igual ao configurado no checkout da Vega: o site só mostra, quem cobra é a Vega.</p>
+        <div className="mb-3 grid gap-3 sm:grid-cols-2">
+          <F id="mx" label="Máximo de parcelas"><select id="mx" value={max} onChange={(e) => setMax(Number(e.target.value))} className={adminInput}>{Array.from({ length: 24 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}x</option>)}</select></F>
+          <F id="pv" label="Prévia com o preço"><select id="pv" value={preview} onChange={(e) => setPreview(Number(e.target.value))} className={adminInput}>{[399000, 799000, 999000].map((c) => <option key={c} value={c}>{money(c)}</option>)}</select></F>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs text-muted-foreground"><tr><th className="py-1 font-normal">Parcelas</th><th className="py-1 font-normal">Acréscimo (%)</th><th className="py-1 font-normal">Parcela</th><th className="py-1 font-normal">Total</th></tr></thead>
+            <tbody>
+              {ns.filter((n) => Number(n) <= max).map((n) => {
+                const it = plan.find((x) => x.n === Number(n));
+                return (
+                  <tr key={n} className="border-t border-border">
+                    <td className="py-1.5">{n}x</td>
+                    <td className="py-1.5"><label className="sr-only" htmlFor={`r${n}`}>Acréscimo em {n}x</label>
+                      <input id={`r${n}`} inputMode="decimal" value={rates[n] ?? ""} placeholder="—" onChange={(e) => setRates({ ...rates, [n]: e.target.value })} className="h-9 w-20 rounded-md border border-input bg-card px-2" /></td>
+                    <td className="py-1.5">{it ? money(it.perCents) : "—"}</td>
+                    <td className="py-1.5 text-muted-foreground">{it ? money(it.totalCents) : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="buy" className="h-11" onClick={() => {
+            if (Object.values(parsed).some((v) => !Number.isFinite(v) || v < 0 || v > 100)) return void toast.error("Use percentuais entre 0 e 100.");
+            save({ installments_max: max, installment_rates: parsed as never });
+          }}>Salvar parcelamento</Button>
+          <Button variant="outline" className="h-11" onClick={() => setRates(Object.fromEntries(Object.entries(DEFAULT_RATES).map(([k, v]) => [k, String(v).replace(".", ",")])))}>Restaurar padrão (23% em 21x, proporcional)</Button>
+        </div>
+      </Box>
+    </>
+  );
+}
+
+function MetaTab({ s }: { s: S }) {
+  const save = useSaveSettings();
+  const status = useServerFn(getMetaStatus); const saveToken = useServerFn(saveMetaToken);
+  const qc = useQueryClient();
+  const m = useQuery({ queryKey: ["admin", "meta"], queryFn: () => status() });
+  const [pixel, setPixel] = useState(s.meta_pixel_id);
+  const [test, setTest] = useState(s.meta_test_event_code);
+  const [token, setToken] = useState("");
+  const [replacing, setReplacing] = useState(false);
+  return (
+    <>
+      <Box title="Pixel da Meta (Facebook/Instagram)">
+        <div className="space-y-3">
+          <F id="px" label="ID do Pixel / conjunto de dados" hint="Só números. Gerenciador de Eventos → Fontes de dados → seu Pixel."><input id="px" inputMode="numeric" value={pixel} onChange={(e) => setPixel(e.target.value.replace(/\D/g, ""))} className={adminInput} /></F>
+          <F id="tc" label="Código de evento de teste (opcional)" hint="Use só enquanto testa em Eventos de teste. Depois apague."><input id="tc" value={test} onChange={(e) => setTest(e.target.value)} className={adminInput} /></F>
+          <Button variant="buy" className="h-11" onClick={() => save({ meta_pixel_id: pixel.trim(), meta_test_event_code: test.trim() })}>Salvar</Button>
+        </div>
+      </Box>
+      <Box title="API de Conversões (token)">
+        {m.isPending ? <div className="h-11 animate-pulse rounded bg-muted" /> : m.data?.hasToken && !replacing ? (
+          <div className="flex items-center gap-2"><span className="flex h-11 flex-1 items-center rounded-md border border-input bg-muted px-3 font-mono">•••• {m.data.last4}</span><Button type="button" variant="outline" className="h-11" onClick={() => setReplacing(true)}>Substituir</Button></div>
+        ) : (
+          <form className="flex flex-col gap-2 sm:flex-row" onSubmit={async (e) => {
+            e.preventDefault();
+            try { const r = await saveToken({ data: { token: token.trim() } }); if (r.ok) { toast.success("Token salvo."); setToken(""); setReplacing(false); qc.invalidateQueries({ queryKey: ["admin", "meta"] }); } }
+            catch { toast.error("Token inválido."); }
+          }}>
+            <label htmlFor="tk" className="sr-only">Token da API de Conversões</label>
+            <input id="tk" type="password" autoComplete="off" placeholder="Cole o token gerado no Gerenciador de Eventos" value={token} onChange={(e) => setToken(e.target.value)} className={adminInput} />
+            <Button type="submit" variant="buy" className="h-11">Salvar token</Button>
+          </form>
+        )}
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          <li>O site envia <strong>PageView</strong>, <strong>ViewContent</strong>, <strong>InitiateCheckout</strong> e <strong>AddPaymentInfo</strong> pelo Pixel.</li>
+          <li>A <strong>compra (Purchase)</strong> vai pelo Pixel e pela API de Conversões, com o mesmo ID para não contar em dobro. Ela é enviada quando o Pix é aprovado ou quando o sinal do pague na entrega é pago.</li>
+          <li>Tudo só acontece se o cliente aceitar o aviso de cookies.</li>
+        </ul>
+      </Box>
+    </>
+  );
+}
 
 function ShippingTab({ s }: { s: S }) {
   const save = useSaveSettings();
