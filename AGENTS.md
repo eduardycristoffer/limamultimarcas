@@ -28,3 +28,5 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- Business numbers live only in `src/config/store.ts`, product data in `src/data/products.ts`, and every data/payment call goes through `src/lib/api.ts` — so Phase 2 backend swaps don't touch screens.
