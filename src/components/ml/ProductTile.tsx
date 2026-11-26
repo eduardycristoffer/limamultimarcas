@@ -21,6 +21,12 @@ export function ProductTile({ p, rail = false }: { p: LiveProduct; rail?: boolea
       <div className="flex flex-1 flex-col gap-1 p-3">
         <div><HotBadge className="whitespace-nowrap">Inauguração</HotBadge></div>
         <h3 className="line-clamp-2 text-[14px] leading-snug text-foreground group-hover:text-link">{p.title}</h3>
+        {p.reviews && (
+          <p className="flex items-center gap-1 text-[12px] text-muted-foreground" aria-label={`Nota ${p.reviews.rating} no ${p.reviews.source}, ${p.reviews.total} avaliações`}>
+            <span className="text-foreground">{p.reviews.rating.toLocaleString("pt-BR", { minimumFractionDigits: 1 })}</span>
+            <span className="text-link" aria-hidden>★</span>({p.reviews.total})
+          </p>
+        )}
         <Price cents={p.price} size={rail ? "sm" : "md"} className="mt-1" />
         <p className="text-[12px] text-muted-foreground">à vista</p>
         {max && max.n > 1 && <p className="text-[13px] text-foreground">ou {max.n}x {moneyCents(max.perCents)}</p>}

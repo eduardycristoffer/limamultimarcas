@@ -19,7 +19,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Lima Multimarcas — Scooters elétricas em Montes Claros/MG" },
-      { name: "description", content: "Scooter 500 W, Cappuccino e Foston GT6X. Frete grátis até 100 km de Montes Claros e pague na entrega." },
+      { name: "description", content: "Scooter 500 W, Cappuccino, Foston GT6X e Foston X15 Max. Frete grátis até 100 km de Montes Claros." },
       { property: "og:title", content: "Lima Multimarcas — Scooters elétricas em Montes Claros" },
       { property: "og:description", content: "Frete grátis até 100 km e pague na entrega. Oferta de inauguração." },
       { property: "og:type", content: "website" },
@@ -55,9 +55,11 @@ function Home() {
           {list.length === 0 ? (
             <div className="py-8 text-center"><p>Nenhuma moto encontrada.</p><Link to="/" search={{ q: undefined }} className="mt-2 inline-block text-link">Ver todos os modelos</Link></div>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">{list.map((p) => <ProductTile key={p.slug} p={p} />)}</div>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-4">{list.map((p) => <ProductTile key={p.slug} p={p} />)}</div>
           )}
         </section>
+
+        <HowToBuyHome products={products} />
 
         <Benefits />
 
@@ -75,7 +77,8 @@ function Home() {
 
 function Banners({ products }: { products: LiveProduct[] }) {
   const s = useSettings();
-  const order = ["cappuccino", "foston-gt6x", "scooter-500w"];
+  const codOn = s.cod_enabled && (s.deposit_cents === 0 || s.deposit_available);
+  const order = ["cappuccino", "foston-gt6x", "foston-x15-max", "scooter-500w"];
   const list = [...products].sort((a, b) => order.indexOf(a.slug) - order.indexOf(b.slug));
   const [active, setActive] = useState(0);
   const track = useRef<HTMLDivElement>(null);
@@ -100,7 +103,7 @@ function Banners({ products }: { products: LiveProduct[] }) {
               <HotBadge className="self-start">{p.badge}</HotBadge>
               <p className="mt-2 text-[24px] font-black uppercase italic leading-none md:text-[44px]">{p.name}</p>
               <p className="mt-2 text-[22px] font-light leading-none md:text-[34px]">{moneyCents(p.price).replace(",00", "")} <span className="text-[12px] font-semibold uppercase md:text-[14px]">à vista</span></p>
-              <p className="mt-2 max-w-[55%] text-[12px] font-semibold leading-snug md:max-w-none md:text-[15px]">Frete grátis até {s.free_shipping_radius_km} km<span className="hidden md:inline">{s.cod_enabled ? " · Pague na entrega" : ""}</span></p>
+              <p className="mt-2 max-w-[55%] text-[12px] font-semibold leading-snug md:max-w-none md:text-[15px]">Frete grátis até {s.free_shipping_radius_km} km<span className="hidden md:inline">{codOn ? " · Pague na entrega" : ""}</span></p>
             </div>
           </Link>
         ))}
@@ -126,15 +129,16 @@ function Shortcuts({ products }: { products: LiveProduct[] }) {
   ];
   return (
     <nav aria-label="Atalhos" className="mx-auto max-w-6xl px-3 py-4 md:px-4">
-      <ul className="flex justify-around gap-2">
+      {/* Celular: bolinhas do app. Computador: cartões lado a lado, como os benefícios do Mercado Livre. */}
+      <ul className="flex justify-around gap-2 md:grid md:auto-cols-fr md:grid-flow-col md:gap-3">
         {items.map((it) => {
           const inner = (
             <>
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-card shadow-[0_1px_2px_rgba(0,0,0,0.15)]"><it.icon className="h-6 w-6 text-primary" /></span>
-              <span className="text-center text-[12px] leading-tight">{it.label}<br /><span className="text-muted-foreground">{it.sub}</span></span>
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-card shadow-[0_1px_2px_rgba(0,0,0,0.15)] md:bg-primary-soft md:shadow-none"><it.icon className="h-6 w-6 text-primary" /></span>
+              <span className="text-center text-[12px] leading-tight md:text-left md:text-[15px]">{it.label}<br /><span className="text-muted-foreground">{it.sub}</span></span>
             </>
           );
-          const cls = "flex w-20 flex-col items-center gap-1.5";
+          const cls = "flex w-20 flex-col items-center gap-1.5 md:w-full md:flex-row md:gap-3 md:rounded-md md:bg-card md:p-4 md:shadow-[0_1px_2px_rgba(0,0,0,0.12)] md:transition-shadow md:hover:shadow-[0_6px_16px_rgba(0,0,0,0.14)]";
           return (
             <li key={it.label}>
               {it.onClick ? <button type="button" onClick={it.onClick} className={cls}>{inner}</button>
@@ -144,6 +148,32 @@ function Shortcuts({ products }: { products: LiveProduct[] }) {
         })}
       </ul>
     </nav>
+  );
+}
+
+function HowToBuyHome({ products }: { products: LiveProduct[] }) {
+  const s = useSettings();
+  const viaVega = products.some((p) => p.checkoutUrl);
+  const codOn = s.cod_enabled && (s.deposit_cents === 0 || s.deposit_available);
+  const steps = [
+    { t: "Escolha sua moto", d: "Veja fotos, ficha técnica e o preço à vista de cada modelo." },
+    viaVega
+      ? { t: "Pague no Pix ou no cartão", d: `Toque em Comprar agora e conclua no checkout seguro da Vega.${codOn ? " Se preferir, pague na entrega." : ""}` }
+      : { t: "Escolha como pagar", d: codOn ? "Pague na entrega ou combine com a loja." : "Combine o pagamento com a loja." },
+    { t: "Receba ou retire", d: `Frete grátis até ${s.free_shipping_radius_km} km de Montes Claros, ou retire grátis na loja.` },
+  ];
+  return (
+    <section id="como-comprar" className="mt-3 scroll-mt-20 rounded-md bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.12)] md:p-5">
+      <h2 className="mb-3 text-[18px] font-normal md:text-[22px]">Como comprar</h2>
+      <ol className="grid gap-4 md:grid-cols-3">
+        {steps.map((st, i) => (
+          <li key={st.t} className="flex gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-[14px] font-bold text-primary-foreground">{i + 1}</span>
+            <span><strong className="block font-semibold">{st.t}</strong><span className="text-[14px] text-muted-foreground">{st.d}</span></span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

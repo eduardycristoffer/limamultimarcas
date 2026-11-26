@@ -23,12 +23,21 @@ function publicClient() {
   });
 }
 
-export type CatalogItem = { slug: string; price_cents: number; stock: number; card_available: boolean };
+/** `checkout_url`: link do checkout da Vega da moto (Pix e cartão). É um link público de pagamento. */
+export type CatalogItem = { slug: string; price_cents: number; stock: number; card_available: boolean; checkout_url: string | null };
+
+const safeCheckoutUrl = (u: string | null) => {
+  if (!u) return null;
+  try { const x = new URL(u); return x.protocol === "https:" ? x.toString() : null; } catch { return null; }
+};
 
 export const getCatalog = createServerFn({ method: "GET" }).handler(async (): Promise<CatalogItem[]> => {
   const { data, error } = await publicClient().from("products").select("slug, price_cents, stock, vega_checkout_url");
   if (error) throw new Error("Não foi possível carregar os produtos.");
-  return (data ?? []).map((p) => ({ slug: p.slug, price_cents: p.price_cents, stock: p.stock, card_available: !!p.vega_checkout_url }));
+  return (data ?? []).map((p) => {
+    const url = safeCheckoutUrl(p.vega_checkout_url);
+    return { slug: p.slug, price_cents: p.price_cents, stock: p.stock, card_available: !!url, checkout_url: url };
+  });
 });
 
 export type PublicSettings = {

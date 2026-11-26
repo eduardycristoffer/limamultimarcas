@@ -24,13 +24,21 @@ export const defaultSettings: PublicSettings = {
   installments_max: paymentConfig.installmentsMax, installment_rates: DEFAULT_RATES, meta_pixel_id: "", site_url: "",
 };
 
-export type LiveProduct = Product & { cardAvailable: boolean };
+/** `checkoutUrl`: checkout da Vega da moto (Pix e cartão). Sem link, a compra segue pelo checkout do site. */
+export type LiveProduct = Product & { cardAvailable: boolean; checkoutUrl: string | null };
 /** Une o conteúdo estático (fotos, textos) ao que o banco diz (preço, estoque, ativo, link Vega). Inativos somem. */
 export function mergeCatalog(items: CatalogItem[]): LiveProduct[] {
   return staticProducts.flatMap((p) => {
     const db = items.find((i) => i.slug === p.slug);
-    return db ? [{ ...p, price: db.price_cents, stock: db.stock, cardAvailable: db.card_available }] : [];
+    return db ? [{ ...p, price: db.price_cents, stock: db.stock, cardAvailable: db.card_available, checkoutUrl: db.checkout_url ?? null }] : [];
   });
+}
+
+/** Link do checkout da Vega com as UTMs da visita (para a Vega e o painel saberem de onde veio a venda). */
+export function vegaCheckoutHref(url: string, tracking: Record<string, string>): string {
+  const u = new URL(url);
+  for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "src"]) if (tracking[k]) u.searchParams.set(k, tracking[k]!);
+  return u.toString();
 }
 
 export function useProducts() { return mergeCatalog(useSuspenseQuery(catalogQuery).data); }

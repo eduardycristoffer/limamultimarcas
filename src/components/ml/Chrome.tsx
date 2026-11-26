@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { BadgeCheck, Bike, Home, MapPin, MessageCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import logo from "@/assets/logo-lima.png.asset.json";
 import { mapsUrl, store } from "@/config/store";
 import { useSettings, waLink } from "@/lib/api";
 import { products } from "@/data/products";
@@ -49,9 +48,9 @@ export function SiteFooter() {
   return (
     <footer className="mt-6 border-t border-border bg-card pb-20 text-[13px] text-muted-foreground md:pb-0">
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:grid-cols-3">
-        <div className="flex items-start gap-3">
-          <img src={logo.url} alt="Logo Lima Multimarcas" width={44} height={44} loading="lazy" className="h-11 w-11 object-contain" />
-          <div><p className="font-semibold text-foreground">{store.name}</p><p>Motos elétricas em {store.city}</p></div>
+        <div>
+          <img src="/brand/lima-logo.png" alt="Lima Multimarcas" width={156} height={48} loading="lazy" className="h-12 w-auto" />
+          <p className="mt-2">Motos elétricas em {store.city}</p>
         </div>
         <div>
           <p className="mb-1 font-semibold text-foreground">Loja física</p>

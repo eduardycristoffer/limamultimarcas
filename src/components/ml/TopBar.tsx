@@ -4,11 +4,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 import logo from "@/assets/logo-lima.png.asset.json";
 import { WhatsAppIcon } from "@/components/lima/WhatsAppIcon";
+import { mapsUrl } from "@/config/store";
 import { useSettings, waLink } from "@/lib/api";
 import { placeLabel, useDeliveryLocation } from "@/lib/location";
 import { openLocationSheet } from "./LocationSheet";
 
 const iconBtn = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-primary-foreground hover:bg-white/10";
+/** Logo horizontal branca (ícone + "LIMA MULTIMARCAS") para o cabeçalho vermelho no computador. */
+const WORDMARK = "/brand/lima-logo-branca.png";
 
 /**
  * Cabeçalho no padrão do app Mercado Livre, em vermelho Lima.
@@ -47,9 +50,8 @@ export function TopBar({ variant = "home", initialQuery = "", shareTitle }: { va
             <button type="button" aria-label="Voltar" className={`${iconBtn} md:hidden`} onClick={() => (window.history.length > 1 ? router.history.back() : navigate({ to: "/" }))}>
               <ArrowLeft className="h-6 w-6" />
             </button>
-            <Link to="/" className="hidden shrink-0 items-center gap-2 md:flex" aria-label="Lima Multimarcas — início">
-              <img src={logo.url} alt="" width={40} height={40} className="h-10 w-10 rounded-full bg-white object-contain p-0.5" />
-              <span className="text-lg font-bold leading-none">Lima<span className="block text-[11px] font-medium opacity-90">Multimarcas</span></span>
+            <Link to="/" className="hidden shrink-0 items-center md:flex" aria-label="Lima Multimarcas — início">
+              <img src={WORDMARK} alt="Lima Multimarcas" width={130} height={40} className="h-10 w-auto" />
             </Link>
             <div className="hidden min-w-0 flex-1 md:flex">{search}</div>
             <div className="ml-auto flex items-center md:ml-0">
@@ -61,8 +63,8 @@ export function TopBar({ variant = "home", initialQuery = "", shareTitle }: { va
         ) : (
           <>
             <Link to="/" className="flex shrink-0 items-center gap-2 pl-1" aria-label="Lima Multimarcas — início">
-              <img src={logo.url} alt="" width={36} height={36} className="h-9 w-9 rounded-full bg-white object-contain p-0.5 md:h-10 md:w-10" />
-              <span className="hidden text-lg font-bold leading-none md:block">Lima<span className="block text-[11px] font-medium opacity-90">Multimarcas</span></span>
+              <img src={logo.url} alt="" width={36} height={36} className="h-9 w-9 rounded-full bg-white object-contain p-0.5 md:hidden" />
+              <img src={WORDMARK} alt="Lima Multimarcas" width={130} height={40} className="hidden h-10 w-auto md:block" />
             </Link>
             <div className="mx-1 flex min-w-0 flex-1">{search}</div>
             {wa && <a href={wa} target="_blank" rel="noreferrer" aria-label="Falar no WhatsApp" className={iconBtn}><WhatsAppIcon className="h-6 w-6" /></a>}
@@ -73,17 +75,30 @@ export function TopBar({ variant = "home", initialQuery = "", shareTitle }: { va
   );
 }
 
-/** Faixa "📍 Enviar para Montes Claros - MG ›" logo abaixo do cabeçalho. */
+/**
+ * Faixa "📍 Enviar para Montes Claros - MG ›" logo abaixo do cabeçalho.
+ * No computador, como no Mercado Livre, ganha os atalhos do lado direito.
+ */
 export function LocationBar() {
   const loc = useDeliveryLocation();
+  const s = useSettings();
+  const wa = waLink(s.whatsapp_number, "Olá, Lima! Vim pelo site.");
+  const link = "whitespace-nowrap opacity-90 hover:opacity-100 hover:underline";
   return (
-    <button type="button" onClick={openLocationSheet}
-      className="flex w-full items-center gap-1.5 bg-primary px-3 pb-2.5 text-left text-[13px] text-primary-foreground md:bg-[oklch(0.52_0.21_28.11)] md:py-2">
-      <span className="mx-auto flex w-full max-w-6xl items-center gap-1.5 md:px-1">
-        <MapPin className="h-4 w-4 shrink-0" aria-hidden />
-        <span className="truncate">{loc ? <>Enviar para <strong className="font-semibold">{loc.street ? `${loc.street} · ` : ""}{placeLabel(loc)}</strong></> : "Informe seu CEP para ver o frete"}</span>
-        <ChevronRight className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-      </span>
-    </button>
+    <div className="bg-primary text-[13px] text-primary-foreground md:bg-[oklch(0.52_0.21_28.11)]">
+      <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-3 pb-2.5 md:px-4 md:py-2">
+        <button type="button" onClick={openLocationSheet} className="flex min-w-0 items-center gap-1.5 text-left">
+          <MapPin className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="truncate">{loc ? <>Enviar para <strong className="font-semibold">{loc.street ? `${loc.street} · ` : ""}{placeLabel(loc)}</strong></> : "Informe seu CEP para ver o frete"}</span>
+          <ChevronRight className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+        </button>
+        <nav aria-label="Atalhos da loja" className="ml-auto hidden items-center gap-5 md:flex">
+          <Link to="/" hash="ofertas" className={link}>Motos elétricas</Link>
+          <Link to="/" hash="como-comprar" className={link}>Como comprar</Link>
+          <a href={mapsUrl} target="_blank" rel="noreferrer" className={link}>Loja física</a>
+          {wa && <a href={wa} target="_blank" rel="noreferrer" className={link}>Atendimento</a>}
+        </nav>
+      </div>
+    </div>
   );
 }

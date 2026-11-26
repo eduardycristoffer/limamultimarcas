@@ -58,9 +58,9 @@ function ProductForm({ p }: { p: P }) {
         <div><label className="mb-1 block text-sm font-medium" htmlFor={`st-${p.slug}`}>Estoque</label><input id={`st-${p.slug}`} inputMode="numeric" value={stock} onChange={(e) => setStock(e.target.value.replace(/\D/g, ""))} className={adminInput} /></div>
       </div>
       <label className="mt-3 flex items-center justify-between gap-2 text-sm font-medium">Ativo na loja<Switch checked={active} onCheckedChange={setActive} /></label>
-      <div className="mt-3"><label className="mb-1 block text-sm font-medium" htmlFor={`url-${p.slug}`}>Link do checkout Vega (cartão)</label>
-        <input id={`url-${p.slug}`} type="url" placeholder="Cole aqui o link do checkout desta moto na Vega" value={url} onChange={(e) => setUrl(e.target.value)} className={adminInput} />
-        <p className="mt-1 text-xs text-muted-foreground">Sem link, a opção Cartão não aparece para esta moto.</p></div>
+      <div className="mt-3"><label className="mb-1 block text-sm font-medium" htmlFor={`url-${p.slug}`}>Link do checkout Vega (Pix e cartão)</label>
+        <input id={`url-${p.slug}`} type="url" placeholder="https://checkout.l1mamultimarcas.com.br/XXXXXXXX" value={url} onChange={(e) => setUrl(e.target.value)} className={adminInput} />
+        <p className="mt-1 text-xs text-muted-foreground">Com o link, o botão Comprar agora leva direto ao checkout da Vega desta moto. Sem link, a compra segue pelo checkout do site.</p></div>
       <Button type="submit" variant="buy" className="mt-4 h-11 w-full" disabled={busy}>{busy ? "Salvando..." : "Salvar"}</Button>
     </form>
   );

@@ -26,7 +26,7 @@ export function PaymentSheet({ p, children }: { p: LiveProduct; children: React.
           <section className="border-b border-line py-3">
             <h3 className="flex items-center gap-2 font-semibold"><QrCode className="h-5 w-5 text-primary" />À vista</h3>
             <p className="mt-1 text-[22px] font-light">{moneyCents(p.price)}</p>
-            {s.pix_available && <p className="text-sm text-muted-foreground">No Pix, com aprovação na hora.</p>}
+            {(s.pix_available || p.checkoutUrl) && <p className="text-sm text-muted-foreground">No Pix, com aprovação na hora{p.checkoutUrl ? ", pelo checkout seguro da Vega" : ""}.</p>}
           </section>
 
           {codOn && (

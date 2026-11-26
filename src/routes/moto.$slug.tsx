@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound, useNavigate, type ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, CreditCard, HandCoins, QrCode, ShieldCheck, Store, Truck } from "lucide-react";
+import { ChevronDown, ChevronRight, CreditCard, ExternalLink, HandCoins, QrCode, ShieldCheck, Star, Store, Truck } from "lucide-react";
 import { TopBar } from "@/components/ml/TopBar";
 import { BottomNav, Full, HotBadge, OfficialStore, SiteFooter } from "@/components/ml/Chrome";
 import { MediaGallery } from "@/components/ml/MediaGallery";
@@ -13,10 +13,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import logo from "@/assets/logo-lima.png.asset.json";
 import { getProduct } from "@/data/products";
 import { mapsUrl, store } from "@/config/store";
-import { cardPlan, catalogQuery, mergeCatalog, settingsQuery, useProducts, useSettings, waLink, type LiveProduct } from "@/lib/api";
+import { cardPlan, catalogQuery, mergeCatalog, settingsQuery, useProducts, useSettings, vegaCheckoutHref, waLink, type LiveProduct } from "@/lib/api";
+import type { MarketplaceReviews } from "@/data/products";
 import { depositFor } from "@/lib/order-rules";
 import { placeLabel, useDeliveryLocation } from "@/lib/location";
-import { setBuyIntent } from "@/lib/checkout-store";
+import { getTracking, setBuyIntent } from "@/lib/checkout-store";
 import { track } from "@/lib/meta-pixel";
 import { money, orList } from "@/lib/format";
 
@@ -74,7 +75,7 @@ function ProductPage() {
   const { slug } = Route.useLoaderData();
   const products = useProducts();
   const s = useSettings();
-  const p: LiveProduct = products.find((x) => x.slug === slug) ?? { ...getProduct(slug)!, cardAvailable: false };
+  const p: LiveProduct = products.find((x) => x.slug === slug) ?? { ...getProduct(slug)!, cardAvailable: false, checkoutUrl: null };
   const others = products.filter((o) => o.slug !== p.slug);
   useEffect(() => { track("ViewContent", { content_ids: [p.slug], content_type: "product", content_name: p.name, value: p.price / 100, currency: "BRL" }); }, [p.slug, p.name, p.price]);
 
@@ -85,8 +86,9 @@ function ProductPage() {
         <Link to="/" className="text-link">Início</Link> › <Link to="/" hash="ofertas" className="text-link">{p.category}</Link> › {p.name}
       </nav>
       <main className="mx-auto max-w-6xl md:px-4">
-        <div className="bg-card md:grid md:grid-cols-[1fr_380px] md:gap-8 md:rounded-md md:p-6">
-          <div className="min-w-0"><MediaGallery p={p} /></div>
+        {/* Tablet: foto em cima e compra embaixo. Duas colunas só a partir de 1024 px. */}
+        <div className="bg-card md:rounded-md md:p-6 lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
+          <div className="min-w-0 md:mx-auto md:max-w-xl lg:max-w-none"><MediaGallery p={p} /></div>
           <BuyColumn p={p} />
         </div>
 
@@ -117,6 +119,13 @@ function ProductPage() {
             </AccordionItem>
           </Accordion>
         </Section>
+
+        {p.reviews && (
+          <>
+            <Sep />
+            <Reviews r={p.reviews} name={p.name} />
+          </>
+        )}
 
         <Sep />
         <HowToBuy p={p} />
@@ -152,16 +161,29 @@ function BuyColumn({ p }: { p: LiveProduct }) {
   const deposit = depositFor(p.price, s.deposit_cents);
   const codOn = s.cod_enabled && (deposit === 0 || s.deposit_available);
   const wa = waLink(s.whatsapp_number, `Olá, Lima! Tenho interesse na ${p.name} (${money(p.price)}).`);
-  const buy = () => { setBuyIntent({ slug: p.slug, quantity: qty }); navigate({ to: "/checkout" }); };
+  const toSiteCheckout = () => { setBuyIntent({ slug: p.slug, quantity: qty }); navigate({ to: "/checkout" }); };
+  // Com o link da Vega cadastrado, Pix e cartão são feitos direto no checkout da Vega.
+  const buy = () => {
+    if (!p.checkoutUrl) return toSiteCheckout();
+    track("InitiateCheckout", { content_ids: [p.slug], content_type: "product", value: p.price / 100, currency: "BRL", num_items: 1 });
+    window.location.assign(vegaCheckoutHref(p.checkoutUrl, getTracking()));
+  };
 
   return (
-    <div className="px-4 pt-4 md:px-0 md:pt-0">
+    <div className="px-4 pt-4 md:px-0 md:pt-6 lg:pt-0">
       <p className="text-[13px] text-muted-foreground">{p.condition}  |  Loja em Montes Claros/MG</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <HotBadge>{p.badge}</HotBadge>
         <Link to="/" hash="ofertas" className="text-[13px] text-link">{p.category}</Link>
       </div>
       <h1 className="mt-2 text-[18px] font-normal leading-snug md:text-[22px]">{p.title}</h1>
+      {p.reviews && (
+        <a href="#opinioes" className="mt-1 flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-link">
+          <span className="text-foreground">{p.reviews.rating.toLocaleString("pt-BR", { minimumFractionDigits: 1 })}</span>
+          <Stars value={p.reviews.rating} />
+          <span>({p.reviews.total}) no {p.reviews.source}</span>
+        </a>
+      )}
 
       <div className="mt-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -225,7 +247,7 @@ function BuyColumn({ p }: { p: LiveProduct }) {
 
       <p className="mt-5 text-[15px] font-semibold">{p.stock > 0 ? "Estoque disponível" : "Sem estoque no momento"}</p>
       {p.stock > 0 && p.stock <= 3 && <p className="text-[13px] font-semibold text-primary">Últimas unidades</p>}
-      {p.stock > 0 && (
+      {p.stock > 0 && !p.checkoutUrl && (
         <label className="relative mt-3 flex h-14 items-center rounded-md bg-surface px-4 text-[15px]">
           <span>Quantidade: <strong className="font-semibold">{qty}</strong> <span className="text-muted-foreground">({p.stock > 1 ? `+${p.stock} disponíveis` : "1 disponível"})</span></span>
           <ChevronDown className="ml-auto h-5 w-5 text-link" aria-hidden />
@@ -237,7 +259,13 @@ function BuyColumn({ p }: { p: LiveProduct }) {
 
       <div className="mt-4 space-y-2">
         <button type="button" onClick={buy} disabled={p.stock < 1} className="h-12 w-full rounded-md bg-primary text-[16px] font-semibold text-primary-foreground hover:bg-primary-hover disabled:opacity-50">Comprar agora</button>
-        {wa && <a href={wa} target="_blank" rel="noreferrer" className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary-soft text-[16px] font-semibold text-primary"><WhatsAppIcon />Tirar dúvidas no WhatsApp</a>}
+        {p.checkoutUrl && p.stock > 0 && <p className="flex items-center justify-center gap-1.5 text-[13px] text-muted-foreground"><ShieldCheck className="h-4 w-4" aria-hidden />Pix ou cartão no checkout seguro da Vega</p>}
+        {p.checkoutUrl && codOn && p.stock > 0 && (
+          <button type="button" onClick={toSiteCheckout} className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary-soft text-[16px] font-semibold text-primary">
+            <HandCoins className="h-5 w-5" aria-hidden />Pagar na entrega
+          </button>
+        )}
+        {wa &&<a href={wa} target="_blank" rel="noreferrer" className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary-soft text-[16px] font-semibold text-primary"><WhatsAppIcon />Tirar dúvidas no WhatsApp</a>}
       </div>
 
       <div className="mt-5 flex items-center gap-3 border-t border-line pt-4">
@@ -245,7 +273,7 @@ function BuyColumn({ p }: { p: LiveProduct }) {
         <div className="text-[15px]"><OfficialStore /><p className="text-[13px] text-muted-foreground">Loja física em {store.city}</p></div>
       </div>
       <ul className="mt-4 space-y-3 pb-5 text-[14px] text-muted-foreground">
-        {s.pix_available && <li className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0" aria-hidden /><span><span className="text-link">Compra segura.</span> O Pix é gerado pela Vega Checkout em nome da loja.</span></li>}
+        {(s.pix_available || p.checkoutUrl) && <li className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0" aria-hidden /><span><span className="text-link">Compra segura.</span> {p.checkoutUrl ? "Pix e cartão pelo checkout da Vega, em nome da loja." : "O Pix é gerado pela Vega Checkout em nome da loja."}</span></li>}
         {codOn && <li className="flex gap-3"><HandCoins className="h-5 w-5 shrink-0" aria-hidden /><span><span className="text-link">Pague na entrega.</span> {deposit > 0 ? `Só ${moneyCents(deposit)} de sinal agora, o resto quando receber.` : "Você só paga quando receber."}</span></li>}
         <li className="flex gap-3"><Truck className="h-5 w-5 shrink-0" aria-hidden /><span><span className="text-link">Entrega.</span> Frete grátis até {s.free_shipping_radius_km} km de Montes Claros.</span></li>
       </ul>
@@ -276,13 +304,23 @@ function HowToBuy({ p }: { p: LiveProduct }) {
             <p className="mt-2 text-[13px] text-muted-foreground">Válido para entregas até {s.pay_on_delivery_max_km} km de Montes Claros. Retirando na loja, funciona do mesmo jeito.</p>
           </div>
         )}
-        {s.pix_available && (
+        {p.checkoutUrl && (
+          <div>
+            <h3 className="mb-2 flex items-center gap-2 font-semibold"><ShieldCheck className="h-5 w-5 text-primary" />Pix ou cartão</h3>
+            <ol className="space-y-2">
+              <Step n={1}>Toque em <strong>Comprar agora</strong>.</Step>
+              <Step n={2}>No checkout seguro da Vega, informe seus dados e o CEP de entrega.</Step>
+              <Step n={3}>Pague {moneyCents(p.price)} no <strong>Pix</strong>{plan.length > 0 ? <> ou parcele no <strong>cartão</strong></> : null}. A Lima entra em contato para combinar a entrega.</Step>
+            </ol>
+          </div>
+        )}
+        {s.pix_available && !p.checkoutUrl && (
           <div>
             <h3 className="mb-2 flex items-center gap-2 font-semibold"><QrCode className="h-5 w-5 text-primary" />Pix à vista</h3>
             <p className="text-[15px]">Pague {moneyCents(p.price)} pelo QR Code ou copia-e-cola. A aprovação é na hora e a página do pedido atualiza sozinha.</p>
           </div>
         )}
-        {plan.length > 0 && (
+        {plan.length > 0 && !p.checkoutUrl && (
           <div>
             <h3 className="mb-2 flex items-center gap-2 font-semibold"><CreditCard className="h-5 w-5 text-primary" />Cartão em até {plan[plan.length - 1]!.n}x</h3>
             <p className="text-[15px]">Você conclui no checkout seguro da Vega. Parcelado tem acréscimo: veja a tabela em <em>Meios de pagamento</em>.</p>
@@ -290,6 +328,53 @@ function HowToBuy({ p }: { p: LiveProduct }) {
         )}
       </div>
     </Section>
+  );
+}
+
+function Stars({ value, size = "h-3.5 w-3.5" }: { value: number; size?: string }) {
+  return (
+    <span className="flex items-center gap-0.5" aria-label={`${value.toLocaleString("pt-BR")} de 5 estrelas`}>
+      {[1, 2, 3, 4, 5].map((i) => {
+        const fill = Math.max(0, Math.min(1, value - (i - 1)));
+        return (
+          <span key={i} className={`relative ${size}`} aria-hidden>
+            <Star className={`absolute inset-0 ${size} text-link/30`} />
+            <span className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}><Star className={`${size} fill-link text-link`} /></span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/** "Opiniões do produto" no formato do Mercado Livre, deixando claro que vêm do ML e não da Lima. */
+function Reviews({ r, name }: { r: MarketplaceReviews; name: string }) {
+  return (
+    <section id="opinioes" className="scroll-mt-20 bg-card px-4 py-5 md:mt-3 md:rounded-md md:px-6">
+      <h2 className="text-[20px] font-normal">Opiniões do produto</h2>
+      <p className="mt-1 text-[13px] text-muted-foreground">
+        Opiniões de compradores da {name} no {r.source}, de várias lojas. Não são avaliações da Lima. Nota conferida em {r.checkedAt}.
+      </p>
+      <div className="mt-4 grid gap-6 md:grid-cols-[220px_1fr]">
+        <div>
+          <p className="text-[48px] font-light leading-none text-link">{r.rating.toLocaleString("pt-BR", { minimumFractionDigits: 1 })}</p>
+          <div className="mt-2"><Stars value={r.rating} size="h-5 w-5" /></div>
+          <p className="mt-1 text-[13px] text-muted-foreground">{r.total} avaliações no {r.source}</p>
+          <a href={r.url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-[14px] text-link">
+            Ver todas no {r.source}<ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          </a>
+        </div>
+        <ul className="space-y-5">
+          {r.comments.map((c, i) => (
+            <li key={i} className="border-b border-line pb-4 last:border-0">
+              <div className="flex items-center justify-between gap-3"><Stars value={c.stars} /><span className="text-[12px] text-muted-foreground">{c.when}</span></div>
+              <p className="mt-2 text-[15px]">{c.text}</p>
+              <p className="mt-1 text-[12px] text-muted-foreground">Comprador no {r.source}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
   );
 }
 

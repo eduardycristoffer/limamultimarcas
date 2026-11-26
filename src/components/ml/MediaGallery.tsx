@@ -13,7 +13,7 @@ export function slidesFor(p: Product): Slide[] {
     { kind: "white", thumb: p.images.white, alt: `${p.title}, foto de frente em fundo branco` },
     { kind: "badges", thumb: p.images.street, alt: `${p.name} estacionada na rua, com os principais destaques` },
     { kind: "studio", thumb: p.images.studio, alt: `${p.name} na cor ${p.color.toLowerCase()}, foto de estúdio` },
-    { kind: "video", thumb: p.video.poster, alt: `Vídeo da ${p.name}` },
+    ...(p.video ? [{ kind: "video" as const, thumb: p.video.poster, alt: `Vídeo da ${p.name}` }] : []),
   ];
 }
 
@@ -42,7 +42,7 @@ function BadgesSlide({ p }: { p: Product }) {
 
 function SlideBody({ p, s, active }: { p: Product; s: Slide; active: boolean }) {
   if (s.kind === "badges") return <BadgesSlide p={p} />;
-  if (s.kind === "video") {
+  if (s.kind === "video" && p.video) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-black">
         {active ? <video src={p.video.src} poster={p.video.poster} controls playsInline preload="metadata" className="h-full w-full object-contain" aria-label={s.alt} />
